@@ -1,10 +1,11 @@
-import os
 from pathlib import Path
 
 from langchain_core.messages import SystemMessage  # Importação adicionada
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+
+from src.config import settings
 
 PROMPT_FILE = Path(__file__).resolve().parent / "perfil_agente.txt"
 
@@ -30,7 +31,7 @@ def analyze_review(review_text: str) -> str:
 
     llm = ChatOpenAI(
         model="deepseek-chat",
-        api_key=os.environ.get("DEEPSEEK_API_KEY"),
+        api_key=settings.DEEPSEEK_API_KEY,
         base_url="https://api.deepseek.com",
     )
 

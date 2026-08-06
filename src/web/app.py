@@ -3,6 +3,8 @@ from pathlib import Path
 
 from flask import Flask, redirect, render_template, request, url_for
 
+from src.config import settings
+
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
@@ -45,4 +47,4 @@ def analyze():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=settings.DEBUG)

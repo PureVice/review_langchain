@@ -3,12 +3,14 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from src.config import settings
+
 # Salva o banco na pasta 'data/' na raiz do projeto (fora do codigo-fonte)
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = ROOT_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-DB_PATH = DATA_DIR / "reviews.db"
+DB_PATH = settings.DATABASE_PATH
 
 
 def get_connection():
