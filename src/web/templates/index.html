@@ -32,14 +32,14 @@
         <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
             <h2 class="text-xl font-semibold mb-4 text-slate-800">Nova Avaliação</h2>
             <form method="POST" action="/analyze" onsubmit="showLoading()">
-                <textarea name="review_text" rows="4" required 
-                    class="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none mb-4" 
+                <textarea name="review_text" rows="4" required
+                    class="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none mb-4"
                     placeholder="Cole aqui o texto da review para análise..."></textarea>
-                
+
                 <button type="submit" id="submitBtn" class="w-full md:w-auto bg-indigo-600 text-white font-semibold py-3 px-8 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
                     Analisar Review
                 </button>
-                
+
                 <button type="button" id="loadingBtn" disabled class="hidden w-full md:w-auto bg-indigo-400 text-white font-semibold py-3 px-8 rounded-xl cursor-not-allowed shadow-sm flex items-center justify-center">
                     <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Processando...
                 </button>
@@ -50,7 +50,7 @@
         <section class="space-y-6">
             {% for entry in entries %}
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                
+
                 <div class="bg-slate-50 p-6 border-b border-slate-200">
                     <div class="flex justify-between items-start mb-2">
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Texto Original (ID: {{ entry.id }})</span>
@@ -61,7 +61,7 @@
 
                 <div class="p-6">
                     {% set data = entry.agent_response %}
-                    
+
                     {% if data and data.get('analise_dimensional') %}
                         <div class="mb-6">
                             <h3 class="text-sm font-bold text-slate-900 mb-3">Domínios Detectados</h3>
@@ -82,11 +82,11 @@
                                     <span class="font-bold text-slate-800">{{ dim }}</span>
                                     <span class="text-lg font-black text-indigo-600">{{ details.score }}/10</span>
                                 </div>
-                                
+
                                 <div class="w-full bg-slate-200 rounded-full h-2 mb-3">
                                     <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ (details.score / 10) * 100 }}%"></div>
                                 </div>
-                                
+
                                 <p class="text-sm text-slate-600 mb-2">{{ details.justificativa }}</p>
                                 <div class="flex gap-4 text-xs text-slate-400">
                                     <span>Confiança: {{ details.confianca }}</span>

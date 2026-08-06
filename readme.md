@@ -33,4 +33,3 @@ Uso com PostgreSQL via Docker
 Observações:
 - Adminer está disponível em http://localhost:8080 para gerenciar o banco (user/postgres por padrão).
 - Se preferir não usar Docker, configure um PostgreSQL externo e ajuste DATABASE_URL.
-
