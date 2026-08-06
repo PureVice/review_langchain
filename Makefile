@@ -1,4 +1,4 @@
-.PHONY: help install run test lint clean docker-build docker-up docker-down
+.PHONY: help install run test clean docker-build docker-up docker-down
 
 # Variáveis
 PYTHON = python3
@@ -35,3 +35,13 @@ docker-up: ## Sobe a aplicação em contêineres Docker em segundo plano
 
 docker-down: ## Para e remove os contêineres Docker
 	docker-compose down
+
+.PHONY: format lint
+
+format:
+	black src/ tests/
+	ruff check --fix src/ tests/
+
+lint:
+	black --check src/ tests/
+	ruff check src/ tests/
