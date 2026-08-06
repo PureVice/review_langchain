@@ -3,7 +3,12 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent / "reviews.db"
+# Salva o banco na pasta 'data/' na raiz do projeto (fora do codigo-fonte)
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_DIR = ROOT_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DB_PATH = DATA_DIR / "reviews.db"
 
 def get_connection():
     """Retorna conexão com o banco SQLite."""
@@ -12,7 +17,7 @@ def get_connection():
     return conn
 
 def init_db():
-    """Cria a tabela de reviews com os campos esperados pelo template."""
+    """Cria a tabela de reviews caso não exista."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -39,13 +44,11 @@ def _format_entry(row):
     """Auxiliar para converter as linhas do banco no formato esperado pelo HTML."""
     raw_response = row["agent_response"]
     
-    # Tenta converter a string do agente em um dicionário JSON para o Jinja2 ler
     try:
         parsed_response = json.loads(raw_response)
     except (json.JSONDecodeError, TypeError):
         parsed_response = raw_response
 
-    # Converte a string de data para objeto datetime para aceitar .strftime() no Jinja2
     raw_date = row["created_at"]
     try:
         created_at_dt = datetime.strptime(raw_date, "%Y-%m-%d %H:%M:%S")

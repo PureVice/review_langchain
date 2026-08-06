@@ -1,23 +1,19 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  db:
-    image: postgres:15
-    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: review_langchain_app
+    ports:
+      - "5000:5000"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-reviews}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - FLASK_ENV=development
     volumes:
-      - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-  adminer:
-    image: adminer
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
+      # Aponta apenas para a pasta de dados, preservando o codigo Python intacto
+      - db_data:/app/data
 
 volumes:
-  db_data: {}
+  db_data:
