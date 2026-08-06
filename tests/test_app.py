@@ -76,5 +76,3 @@ def test_analyze_post_empty_text(mock_save, mock_analyze, client):
     mock_save.assert_not_called()
     assert response.status_code == 302
     
-def test_ci():
-    assert 1==2
