@@ -13,3 +13,4 @@ ENV/
 *.db
 reviews.db
 src/database/reviews.db
+.coverage
