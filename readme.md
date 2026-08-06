@@ -1,13 +1,8 @@
-este projeto se trata de um avaliador de opiniões utilizando agentes de IA.
-A ideia final é que, dada uma string como input, a saída deverá ser sua avaliação de utilidade.
-a avaliação funcionará da seguinte forma:
-    terão 3 agentes: um cliente hipotético
-
-    o cliente hipotético
+este projeto se trata de um avaliador de opiniões utilizando LLMs
 
 Persistência de dados
 
-- As reviews e as respostas do agente são salvas em um banco de dados para uso posterior em treino de modelos.
+- As reviews e as respostas do modelo são salvas em um banco de dados para uso posterior em treino de outros modelos.
 - Por padrão utiliza SQLite (arquivo reviews.db). Para usar PostgreSQL ou outro banco eficiente, defina a variável de ambiente DATABASE_URL.
   - Exemplo Postgres: export DATABASE_URL='postgresql+psycopg://user:password@host:5432/dbname'
 
