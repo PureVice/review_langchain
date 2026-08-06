@@ -1,3 +1,5 @@
 /venv
 .env
-review_.zip
+*.zip
+*.db
+*__pycache__

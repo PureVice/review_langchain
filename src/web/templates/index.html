@@ -31,8 +31,8 @@
         {% if not single %}
         <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
             <h2 class="text-xl font-semibold mb-4 text-slate-800">Nova Avaliação</h2>
-            <form method="POST" action="/" onsubmit="showLoading()">
-                <textarea name="review" rows="4" required 
+            <form method="POST" action="/analyze" onsubmit="showLoading()">
+                <textarea name="review_text" rows="4" required 
                     class="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none mb-4" 
                     placeholder="Cole aqui o texto da review para análise..."></textarea>
                 

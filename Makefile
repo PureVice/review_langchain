@@ -1,34 +1,37 @@
-# Makefile for review_langchain
+.PHONY: help install run test lint clean docker-build docker-up docker-down
 
-.PHONY: help install env db-up db-down db-wait run run-web
+# Variáveis
+PYTHON = python3
+PIP = pip
+FLASK_APP = src/web/app.py
 
-help:
-	@echo "Targets: install, env, db-up, db-down, db-wait, run, run-web"
+help: ## Exibe a lista de comandos disponíveis
+	@echo "Comandos disponíveis:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-install:
-	python -m pip install -r requirements.txt
+install: ## Instala as dependências do projeto
+	$(PIP) install -r requirements.txt
 
-# Create .env from example if missing
-env:
-	[ -f .env ] || cp .env.example .env && echo "Created .env from .env.example (edit as needed)"
+run: ## Executa a aplicação localmente
+	PYTHONPATH=. $(PYTHON) $(FLASK_APP)
 
-# Start PostgreSQL (via docker-compose)
-db-up:
+test: ## Executa os testes automatizados com pytest
+	PYTHONPATH=. pytest tests/ -v
+
+lint: ## Executa a verificação de padrão de código (Flake8)
+	flake8 src tests --max-line-length=88
+
+clean: ## Remove arquivos temporários, caches do Python e do Pytest
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+	rm -rf .pytest_cache
+	rm -rf .coverage
+
+docker-build: ## Constrói a imagem Docker via docker-compose
+	docker-compose build
+
+docker-up: ## Sobe a aplicação em contêineres Docker em segundo plano
 	docker-compose up -d
 
-# Stop and remove containers
-db-down:
+docker-down: ## Para e remove os contêineres Docker
 	docker-compose down
-
-# Wait for Postgres service to accept connections (uses docker-compose exec pg_isready)
-db-wait:
-	@echo "Waiting for Postgres to be ready..."
-	@bash -c 'until docker-compose exec -T db pg_isready -U "${POSTGRES_USER:-postgres}" >/dev/null 2>&1; do sleep 1; printf "."; done; echo "\nPostgres is ready."'
-
-# Run CLI app (reads one review from stdin)
-run:
-	python main.py
-
-# Run web app
-run-web:
-	python app.py
