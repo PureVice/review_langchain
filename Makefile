@@ -42,4 +42,4 @@ docker-up: ## Sobe a aplicação em contêineres Docker em segundo plano
 	docker-compose up -d
 
 docker-down: ## Para e remove os contêineres Docker
-	docker-compose down
+	docker-compose down --remove-orphans

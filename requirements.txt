@@ -1,7 +1,6 @@
 langchain
 langchain-openai
 sqlalchemy
-psycopg[binary]
 python-dotenv
 flask
 pytest>=8.0.0
@@ -11,3 +10,4 @@ black==24.4.2
 ruff==0.4.4
 pre-commit>=3.7.0
 pydantic-settings>=2.0.0
+psycopg2-binary>=2.9.0

@@ -1,19 +1,29 @@
 version: '3.8'
 
 services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: review_langchain_app
+  db:
+    image: postgres:15-alpine
+    container_name: review_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: review_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: review_app
     ports:
       - "5000:5000"
     environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/review_db
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - FLASK_ENV=development
-    volumes:
-      # Aponta apenas para a pasta de dados, preservando o codigo Python intacto
-      - db_data:/app/data
+      - DEBUG=True
+    depends_on:
+      - db
 
 volumes:
-  db_data:
+  postgres_data:

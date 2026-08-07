@@ -3,8 +3,10 @@ from unittest.mock import patch
 from src.schemas import ReviewRequest
 
 
-def test_index_route(client):
+@patch("src.web.app.review_service.get_all_reviews")
+def test_index_route(mock_get_all, client):
     """Testa o acesso à rota principal /."""
+    mock_get_all.return_value = []
     response = client.get("/")
     assert response.status_code == 200
 
@@ -20,8 +22,10 @@ def test_analyze_post_success(mock_process, client):
     mock_process.assert_called_once_with(ReviewRequest(review_text="Produto excelente"))
 
 
-def test_show_review_not_found(client, temp_db):
+@patch("src.web.app.review_service.get_review_by_id")
+def test_show_review_not_found(mock_get_by_id, client):
     """Testa o acesso a uma avaliação inexistente, que deve redirecionar para a raiz."""
+    mock_get_by_id.return_value = None
     response = client.get("/review/9999", follow_redirects=False)
     assert response.status_code == 302
     assert "/" in response.location
