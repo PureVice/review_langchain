@@ -48,7 +48,7 @@ def analyze_review(request: ReviewRequest) -> ReviewResponse:
 
     llm = ChatOpenAI(
         model="deepseek-chat",
-        api_key=settings.DEEPSEEK_API_KEY,
+        api_key=settings.OPENAI_API_KEY,
         base_url="https://api.deepseek.com",
     )
 

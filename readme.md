@@ -10,12 +10,12 @@ Dependências úteis
 
 - SQLAlchemy (recomendado): pip install sqlalchemy
 - Psycopg (Postgres driver): pip install psycopg[binary]
-- LangChain / deepseek client: siga as instruções originais do projeto (DEEPSEEK_API_KEY deve estar setada)
+- LangChain / deepseek client: siga as instruções originais do projeto (OPENAI_API_KEY deve estar setada)
 
 Execução
 
 1. Exporte variáveis de ambiente necessárias:
-   - DEEPSEEK_API_KEY (obrigatório)
+   - OPENAI_API_KEY (obrigatório)
    - DATABASE_URL (opcional — usa SQLite se ausente)
 2. Execute: python main.py
 3. Cole a review e pressione Enter; o agente avaliará e o resultado será salvo no banco.

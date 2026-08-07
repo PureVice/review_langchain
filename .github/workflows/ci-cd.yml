@@ -33,7 +33,7 @@ jobs:
 
       - name: Run tests with coverage
         env:
-          DEEPSEEK_API_KEY: "fake-key-for-ci"
+          OPENAI_API_KEY: "fake-key-for-ci"
         run: |
           pytest --cov=src tests/
 

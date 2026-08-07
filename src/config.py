@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    DEEPSEEK_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
     DEBUG: bool = False
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/review_db"
 

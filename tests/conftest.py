@@ -5,7 +5,7 @@ import pytest
 
 # 1. Configura as variáveis de ambiente base
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-os.environ["DEEPSEEK_API_KEY"] = "test_key"
+os.environ["OPENAI_API_KEY"] = "test_key"
 os.environ["DEBUG"] = "False"
 
 # 2. Força a sobrescrita das configurações na memória caso o Pydantic já tenha lido o .env.
