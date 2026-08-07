@@ -46,7 +46,7 @@ lint:
 	black --check src/ tests/
 	ruff check src/ tests/
 
-	.PHONY: prepare-precommit
+.PHONY: prepare-precommit
 
 prepare-precommit:
 	pre-commit install
