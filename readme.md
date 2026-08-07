@@ -13,25 +13,11 @@
 ![Tests](https://img.shields.io/badge/Tests-Pytest-0A9EDC?logo=pytest&logoColor=white)
 ![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
 
-<<<<<<< HEAD
-- SQLAlchemy (recomendado): pip install sqlalchemy
-- Psycopg (Postgres driver): pip install psycopg[binary]
-- LangChain / deepseek client: siga as instruções originais do projeto (OPENAI_API_KEY deve estar setada)
-=======
 </div>
->>>>>>> 36de70bec6d9000b58a243b4c3ab9de7b9392faa
 
 ---
 
-<<<<<<< HEAD
-1. Exporte variáveis de ambiente necessárias:
-   - OPENAI_API_KEY (obrigatório)
-   - DATABASE_URL (opcional — usa SQLite se ausente)
-2. Execute: python main.py
-3. Cole a review e pressione Enter; o agente avaliará e o resultado será salvo no banco.
-=======
 ##  Sobre o projeto
->>>>>>> 36de70bec6d9000b58a243b4c3ab9de7b9392faa
 
 Reviews de usuários costumam ser subjetivas, verbosas e difíceis de aproveitar em pipelines de treino de modelos. Este projeto resolve esse problema com um **agente de anotação de dados** que recebe um texto livre e devolve uma avaliação estruturada em 4 dimensões independentes — **Riqueza Descritiva, Objetividade, Consistência Lógica e Utilidade Prática** — com scores, evidências extraídas do texto, nível de confiança e "avaliabilidade" por dimensão.
 
