@@ -50,3 +50,9 @@ def test_analyze_post_exception(mock_process, client):
     )
     assert response.status_code == 302
     mock_process.assert_called_once()
+
+
+def test_swagger_docs(client):
+    """Testa se a página de documentação do Swagger UI está acessível."""
+    response = client.get("/apidocs/")
+    assert response.status_code == 200
