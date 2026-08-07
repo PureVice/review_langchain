@@ -13,10 +13,9 @@ def temp_db(tmp_path):
     db_file = tmp_path / "test_reviews.db"
     db_path_str = str(db_file)
 
-    with (
-        patch("src.config.settings.DATABASE_PATH", db_path_str),
-        patch("src.database.db.DB_PATH", db_path_str),
-    ):
+    # Mantemos o patch apenas no settings.
+    # O ReviewRepository consumirá esta configuração ao ser instanciado.
+    with patch("src.config.settings.DATABASE_PATH", db_path_str):
         conn = sqlite3.connect(db_path_str)
         cursor = conn.cursor()
         cursor.execute(
