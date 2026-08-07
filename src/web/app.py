@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from flask import Flask, redirect, render_template, request, url_for
+from pydantic import ValidationError
 
 from src.config import settings, setup_logging
 
@@ -12,6 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from src.agent.agent import analyze_review
 from src.database.db import get_all_reviews, get_review_by_id, init_db, save_review
+from src.schemas import ReviewRequest
 
 # Inicializa as configurações Globais de Logs
 setup_logging()
@@ -47,18 +49,19 @@ def show_review(review_id):
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    """Recebe o texto enviado pelo formulário e executa a análise."""
+    """Recebe o texto enviado pelo formulário, valida via Pydantic e executa a análise."""
     logger.info("Requisição POST recebida no endpoint '/analyze'.")
-    review_text = request.form.get("review_text", "").strip()
+    raw_text = request.form.get("review_text", "").strip()
 
-    if review_text:
-        try:
-            agent_response = analyze_review(review_text)
-            save_review(review_text, agent_response)
-        except Exception:
-            logger.exception("Erro ao processar e armazenar a avaliação enviada.")
-    else:
-        logger.warning("Requisição POST recebida com o campo 'review_text' vazio.")
+    try:
+        # Validação de dados com o schema Pydantic
+        review_request = ReviewRequest(review_text=raw_text)
+        agent_response = analyze_review(review_request)
+        save_review(review_request.review_text, agent_response)
+    except ValidationError as ve:
+        logger.warning("Falha na validação dos dados de entrada (Pydantic): %s", ve)
+    except Exception:
+        logger.exception("Erro ao processar e armazenar a avaliação enviada.")
 
     return redirect(url_for("index"))
 

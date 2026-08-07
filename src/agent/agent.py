@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
+from src.schemas import ReviewRequest, ReviewResponse
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +35,9 @@ def _load_system_prompt() -> str:
         return "Você é um assistente especialista em análise de avaliações e reviews."
 
 
-def analyze_review(review_text: str) -> str:
+def analyze_review(request: ReviewRequest) -> ReviewResponse:
     """
-    Recebe o texto do usuário, aplica o prompt do agente e faz a chamada à LLM via LangChain.
+    Recebe a requisição validada pelo Pydantic, executa o fluxo do agente e retorna um ReviewResponse.
     """
     logger.info("Iniciando a chamada do agente LLM para processar a avaliação.")
     system_prompt_text = _load_system_prompt()
@@ -53,9 +55,16 @@ def analyze_review(review_text: str) -> str:
     chain = prompt | llm | StrOutputParser()
 
     try:
-        response = chain.invoke({"input": review_text})
+        raw_output = chain.invoke({"input": request.review_text})
         logger.info("Processamento da LLM concluído com sucesso.")
-        return response
+
+        # Tenta converter a saída para dicionário/estrutura de dados se for um JSON válido
+        try:
+            parsed_analysis = json.loads(raw_output)
+        except (json.JSONDecodeError, TypeError):
+            parsed_analysis = raw_output
+
+        return ReviewResponse(analysis=parsed_analysis)
     except Exception:
         logger.exception("Falha na chamada da API LLM / LangChain.")
         raise

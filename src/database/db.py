@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.config import settings
+from src.schemas import Review, ReviewResponse
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +46,28 @@ def init_db():
         raise
 
 
-def save_review(review_text: str, agent_response: str):
-    """Insere um novo registro no banco."""
+def save_review(review_text: str, agent_response: ReviewResponse | dict | list | str):
+    """Insere um novo registro no banco de dados."""
     logger.info("Salvando nova avaliação no banco de dados.")
+
+    # Extrai o conteúdo se for uma instância do Pydantic
+    if isinstance(agent_response, ReviewResponse):
+        content = agent_response.analysis
+    else:
+        content = agent_response
+
+    # Serializa objetos estruturados para string armazenável no banco
+    if isinstance(content, dict | list):
+        response_str = json.dumps(content, ensure_ascii=False)
+    else:
+        response_str = str(content)
+
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO reviews (review_text, agent_response) VALUES (?, ?)",
-                (review_text, agent_response),
+                (review_text, response_str),
             )
             conn.commit()
         logger.info("Avaliação salva no banco com sucesso.")
@@ -62,8 +76,8 @@ def save_review(review_text: str, agent_response: str):
         raise
 
 
-def _format_entry(row):
-    """Auxiliar para converter as linhas do banco no formato esperado pelo HTML."""
+def _format_entry(row: sqlite3.Row) -> Review:
+    """Auxiliar para converter as linhas do banco na instância do modelo Pydantic Review."""
     raw_response = row["agent_response"]
 
     try:
@@ -88,16 +102,16 @@ def _format_entry(row):
         )
         created_at_dt = datetime.now()
 
-    return {
-        "id": row["id"],
-        "review_text": row["review_text"],
-        "agent_response": parsed_response,
-        "created_at": created_at_dt,
-    }
+    return Review(
+        id=row["id"],
+        review_text=row["review_text"],
+        agent_response=parsed_response,
+        created_at=created_at_dt,
+    )
 
 
-def get_all_reviews():
-    """Retorna todas as avaliações formatadas."""
+def get_all_reviews() -> list[Review]:
+    """Retorna todas as avaliações formatadas como modelos Pydantic Review."""
     logger.info("Buscando todas as avaliações salvas.")
     try:
         with get_connection() as conn:
@@ -114,8 +128,8 @@ def get_all_reviews():
         raise
 
 
-def get_review_by_id(review_id: int):
-    """Retorna uma única avaliação por ID."""
+def get_review_by_id(review_id: int) -> Review | None:
+    """Retorna uma única avaliação por ID como modelo Pydantic Review."""
     logger.info("Buscando avaliação com ID: %d", review_id)
     try:
         with get_connection() as conn:
