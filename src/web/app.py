@@ -11,20 +11,20 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-# Importando o Repository, o Service e o Agente
 from src.agent.agent import analyze_review
-from src.database.repository import ReviewRepository
+from src.database.sqlite_repository import SQLiteRepository
 from src.schemas import ReviewRequest
 from src.service.review_service import ReviewService
 
+# Inicializa as configurações Globais de Logs
 setup_logging()
 logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
 
-# Injeção de dependências: Instanciamos o Repositório e passamos para o Serviço
-review_repository = ReviewRepository()
+# Injeção de dependências: Instanciamos o Repositório SQLite e passamos para o Serviço
+review_repository = SQLiteRepository()
 review_service = ReviewService(
     repository=review_repository, agent_function=analyze_review
 )
