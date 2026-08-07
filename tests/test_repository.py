@@ -2,126 +2,86 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.database.postgres_repository import PostgresRepository
-from src.schemas import Review
+from src.database.sqlalchemy_repository import SQLAlchemyRepository
 
 
 @pytest.fixture
-def mock_db():
-    """Cria mocks para a conexão e o cursor do psycopg2."""
-    with patch("src.database.postgres_repository.psycopg2.connect") as mock_connect:
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-
-        mock_connect.return_value = mock_conn
-        mock_conn.__enter__.return_value = mock_conn
-        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
-
-        yield mock_connect, mock_conn, mock_cursor
+def repo():
+    """Cria um repositório usando banco em memória (SQLite) exclusivo para testes."""
+    return SQLAlchemyRepository(db_url="sqlite:///:memory:")
 
 
-def test_init_db_success(mock_db):
-    """Verifica se a tabela é criada na inicialização."""
-    _, mock_conn, mock_cursor = mock_db
-
-    PostgresRepository(db_url="fake_url")
-
-    executed_query = mock_cursor.execute.call_args[0][0]
-
-    assert "CREATE TABLE IF NOT EXISTS reviews" in executed_query
-    assert "id SERIAL PRIMARY KEY" in executed_query
-    mock_conn.commit.assert_called()
+def test_init_db_success(repo):
+    """Verifica se as tabelas são criadas corretamente na inicialização."""
+    assert repo.get_all() == []
 
 
-@patch("src.database.postgres_repository.PostgresRepository._init_db")
-def test_save_success(mock_init_db, mock_db):
-    """Verifica se o comando INSERT é executado corretamente."""
-    _, mock_conn, mock_cursor = mock_db
-    repo = PostgresRepository(db_url="fake_url")
-
+def test_save_success(repo):
+    """Verifica se o SQLAlchemy insere e commita corretamente."""
     repo.save("Produto excelente", '{"score": 10}')
-
-    mock_cursor.execute.assert_called_with(
-        "INSERT INTO reviews (review_text, agent_response) VALUES (%s, %s)",
-        ("Produto excelente", '{"score": 10}'),
-    )
-    mock_conn.commit.assert_called_once()
-
-
-@patch("src.database.postgres_repository.PostgresRepository._init_db")
-def test_get_all_success(mock_init_db, mock_db):
-    """Verifica se o SELECT traz os dados e os formata como Pydantic."""
-    _, _, mock_cursor = mock_db
-
-    mock_cursor.fetchall.return_value = [
-        {
-            "id": 1,
-            "review_text": "Bom",
-            "agent_response": '{"status": "ok"}',
-            "created_at": "2026-08-07 12:00:00",
-        }
-    ]
-
-    repo = PostgresRepository(db_url="fake_url")
     results = repo.get_all()
 
     assert len(results) == 1
-    assert isinstance(results[0], Review)
-    assert results[0].id == 1
-    assert results[0].agent_response == {"status": "ok"}
+    assert results[0].review_text == "Produto excelente"
 
 
-@patch("src.database.postgres_repository.PostgresRepository._init_db")
-def test_get_by_id_found(mock_init_db, mock_db):
+def test_get_all_success(repo):
+    """Verifica se o SELECT traz os dados formatados e ordenados de forma decrescente."""
+    repo.save("Bom", '{"status": "ok"}')
+    repo.save("Ruim", '{"status": "erro"}')
+
+    results = repo.get_all()
+    assert len(results) == 2
+    assert results[0].review_text == "Ruim"
+    assert results[1].review_text == "Bom"
+
+
+def test_get_by_id_found(repo):
     """Verifica a busca de um registro específico."""
-    _, _, mock_cursor = mock_db
+    repo.save("Neutro", "Resposta pura")
+    saved = repo.get_all()[0]
 
-    mock_cursor.fetchone.return_value = {
-        "id": 5,
-        "review_text": "Ruim",
-        "agent_response": "Resposta pura",
-        "created_at": "2026-08-07 12:00:00",
-    }
-
-    repo = PostgresRepository(db_url="fake_url")
-    result = repo.get_by_id(5)
-
-    assert result.id == 5
+    result = repo.get_by_id(saved.id)
+    assert result.id == saved.id
     assert result.agent_response == "Resposta pura"
-    mock_cursor.execute.assert_called_with(
-        "SELECT id, review_text, agent_response, created_at FROM reviews WHERE id = %s",
-        (5,),
-    )
 
 
-@patch("src.database.postgres_repository.PostgresRepository._init_db")
-def test_get_by_id_not_found(mock_init_db, mock_db):
+def test_get_by_id_not_found(repo):
     """Verifica o comportamento quando o ID não existe."""
-    _, _, mock_cursor = mock_db
-    mock_cursor.fetchone.return_value = None
-
-    repo = PostgresRepository(db_url="fake_url")
     result = repo.get_by_id(99)
-
     assert result is None
 
 
-def test_repository_exceptions(mock_db):
-    """Garante que as exceções do banco sejam propagadas no repositório."""
-    mock_connect, _, _ = mock_db
-    mock_connect.side_effect = Exception("Falha de conexão Postgres")
+def test_format_entry_json_fallback(repo):
+    """Testa o fallback para string quando o JSON é inválido."""
+    repo.save("Teste JSON falho", "Isto não é um JSON")
+    result = repo.get_all()[0]
+    assert result.agent_response == "Isto não é um JSON"
 
-    repo = PostgresRepository.__new__(PostgresRepository)
-    repo.db_url = "fake_url"
 
-    with pytest.raises(Exception, match="Falha de conexão Postgres"):
-        repo._init_db()
+def test_repository_exceptions():
+    """Força erros no SQLAlchemy para garantir que as exceções sejam propagadas."""
+    repo = SQLAlchemyRepository(db_url="sqlite:///:memory:")
 
-    with pytest.raises(Exception, match="Falha de conexão Postgres"):
-        repo.save("Teste", "Resposta")
+    with patch.object(repo, "SessionLocal") as mock_sessionmaker:
+        mock_session = MagicMock()
+        mock_session.commit.side_effect = Exception("DB Error")
+        mock_session.query.side_effect = Exception("DB Error")
+        mock_sessionmaker.return_value = mock_session
 
-    with pytest.raises(Exception, match="Falha de conexão Postgres"):
-        repo.get_all()
+        with pytest.raises(Exception, match="DB Error"):
+            repo.save("Teste", "Resposta")
 
-    with pytest.raises(Exception, match="Falha de conexão Postgres"):
-        repo.get_by_id(1)
+        with pytest.raises(Exception, match="DB Error"):
+            repo.get_all()
+
+        with pytest.raises(Exception, match="DB Error"):
+            repo.get_by_id(1)
+
+
+@patch("src.database.sqlalchemy_repository.Base.metadata.create_all")
+def test_init_db_exception(mock_create_all):
+    """Força erro na inicialização do banco."""
+    mock_create_all.side_effect = Exception("Init Error")
+    with pytest.raises(Exception, match="Init Error"):
+        SQLAlchemyRepository(db_url="sqlite:///:memory:")

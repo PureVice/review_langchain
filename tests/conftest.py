@@ -3,17 +3,17 @@ from unittest.mock import patch
 
 import pytest
 
-# Injeta variáveis de ambiente simuladas ANTES de importar a aplicação.
-# Isso impede que o sistema tente ler seu .env local.
-os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test_db"
+# 1. Configura as variáveis de ambiente base
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["DEEPSEEK_API_KEY"] = "test_key"
 os.environ["DEBUG"] = "False"
 
-# Isolamento de Importação:
-# Mockamos o _init_db apenas durante a importação do app.
-# Isso impede chamadas ao banco real na fase de coleta do Pytest.
-with patch("src.database.postgres_repository.PostgresRepository._init_db"):
-    from src.web.app import app
+# 2. Força a sobrescrita das configurações na memória caso o Pydantic já tenha lido o .env.
+# 3. Bloqueia a execução do _init_db para que nenhuma tabela tente ser criada
+#    durante a fase de coleta de testes do Pytest.
+with patch("src.config.settings.DATABASE_URL", "sqlite:///:memory:"):
+    with patch("src.database.sqlalchemy_repository.SQLAlchemyRepository._init_db"):
+        from src.web.app import app
 
 
 @pytest.fixture
