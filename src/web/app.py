@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 from flasgger import Swagger
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, Response, redirect, render_template, request, url_for
 from pydantic import ValidationError
 
 from src.config import settings, setup_logging
@@ -118,6 +118,65 @@ def analyze():
         logger.exception("Erro ao processar e armazenar a avaliação enviada.")
 
     return redirect(url_for("index"))
+
+
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    """
+    Recebe o upload de um arquivo JSON ou CSV com o campo 'content' e processa as avaliações.
+    ---
+    tags:
+      - Reviews
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: Arquivo .json ou .csv contendo o campo 'content' com as avaliações.
+    responses:
+      302:
+        description: Redireciona para a página inicial após processar o arquivo.
+    """
+    logger.info("Requisição POST recebida no endpoint '/upload'.")
+    uploaded = request.files.get("file")
+
+    if not uploaded or not uploaded.filename:
+        logger.warning("Nenhum arquivo enviado no endpoint '/upload'.")
+        return redirect(url_for("index"))
+
+    try:
+        raw_bytes = uploaded.read()
+        review_service.process_file_upload(uploaded.filename, raw_bytes)
+    except ValueError as ve:
+        logger.warning("Erro de validação no arquivo enviado: %s", ve)
+    except Exception:
+        logger.exception("Erro ao processar o arquivo enviado no upload.")
+
+    return redirect(url_for("index"))
+
+
+@app.route("/export/csv", methods=["GET"])
+def export_csv():
+    """
+    Exporta o dataset completo de avaliações analisadas em formato CSV.
+    ---
+    tags:
+      - Reviews
+    produces:
+      - text/csv
+    responses:
+      200:
+        description: Arquivo CSV contendo as avaliações e análises.
+    """
+    logger.info("Requisição GET recebida no endpoint '/export/csv'.")
+    csv_content = review_service.export_reviews_to_csv()
+    return Response(
+        csv_content,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=reviews_dataset.csv"},
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
