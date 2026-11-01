@@ -6,11 +6,11 @@ from src.agent import agent
 from src.schemas import ReviewRequest, ReviewResponse
 
 
-@patch("src.agent.agent.ChatOpenAI")
-def test_analyze_review(mock_chat_openai):
+@patch("src.agent.agent.ChatGoogleGenerativeAI")
+def test_analyze_review(mock_chat_gemini):
     """Testa o fluxo da função analyze_review simulando a execução da cadeia LangChain."""
     mock_llm_instance = MagicMock()
-    mock_chat_openai.return_value = mock_llm_instance
+    mock_chat_gemini.return_value = mock_llm_instance
 
     with patch(
         "langchain_core.runnables.RunnableSequence.invoke",
@@ -53,9 +53,9 @@ def test_load_system_prompt_exception(mock_file, mock_exists):
     assert "Você é um assistente especialista" in prompt
 
 
-@patch("src.agent.agent.ChatOpenAI")
-def test_analyze_review_api_exception(mock_chat_openai):
-    """Testa a propagação do erro quando a LangChain/OpenAI falha."""
+@patch("src.agent.agent.ChatGoogleGenerativeAI")
+def test_analyze_review_api_exception(mock_chat_gemini):
+    """Testa a propagação do erro quando o Gemini/LangChain falha."""
     with patch(
         "langchain_core.runnables.RunnableSequence.invoke",
         side_effect=Exception("API limit exceeded"),

@@ -5,7 +5,7 @@ from pathlib import Path
 from langchain_core.messages import SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from src.config import settings
 from src.schemas import ReviewRequest, ReviewResponse
@@ -46,10 +46,10 @@ def analyze_review(request: ReviewRequest) -> ReviewResponse:
         [SystemMessage(content=system_prompt_text), ("human", "{input}")]
     )
 
-    llm = ChatOpenAI(
-        model="deepseek-chat",
-        api_key=settings.OPENAI_API_KEY,
-        base_url="https://api.deepseek.com",
+    llm = ChatGoogleGenerativeAI(
+        model=settings.GEMINI_MODEL,
+        google_api_key=settings.api_key or None,
+        temperature=0.2,
     )
 
     chain = prompt | llm | StrOutputParser()

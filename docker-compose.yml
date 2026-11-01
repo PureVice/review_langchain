@@ -20,6 +20,9 @@ services:
       - "5000:5000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/review_db
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      - MODEL_API_KEY=${MODEL_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DEBUG=True
     depends_on:

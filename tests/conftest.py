@@ -5,6 +5,7 @@ import pytest
 
 # 1. Configura as variáveis de ambiente base
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["GOOGLE_API_KEY"] = "test_key"
 os.environ["OPENAI_API_KEY"] = "test_key"
 os.environ["DEBUG"] = "False"
 
