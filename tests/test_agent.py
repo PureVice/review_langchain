@@ -118,3 +118,58 @@ def test_analyze_reviews_batch_api_success(mock_client_cls):
     assert results[0].input_tokens == 50
     assert results[0].output_tokens == 30
     assert results[0].total_tokens == 80
+
+
+def test_agente_analysis_output_schema_validation():
+    """Testa se a saída estruturada do perfil_agente (escala 1 a 5 e validações) valida no Pydantic."""
+    from src.schemas import AgenteAnalysisOutput
+
+    payload = {
+        "metadados": {
+            "dominios_detectados": [{"dominio": "produto", "confianca": 0.95}]
+        },
+        "evidencias_estruturadas": [
+            {
+                "trecho": "o produto é ótimo e funcionou bem",
+                "dimensoes": ["RD", "OB", "UT"],
+                "polaridade_relato": "positivo",
+            }
+        ],
+        "analise_dimensional": {
+            "RD": {
+                "justificativa": "Menciona atributos e contexto.",
+                "avaliabilidade": 1.0,
+                "confianca": 0.95,
+                "score": 4,
+            },
+            "OB": {
+                "justificativa": "Fatos claros.",
+                "avaliabilidade": 1.0,
+                "confianca": 0.95,
+                "score": 5,
+            },
+            "CL": {
+                "justificativa": "Sem contradição.",
+                "avaliabilidade": 0.0,
+                "confianca": 0.90,
+                "score": 3,
+            },
+            "UT": {
+                "justificativa": "Reduz incerteza de compra.",
+                "avaliabilidade": 1.0,
+                "confianca": 0.95,
+                "score": 4,
+            },
+        },
+        "validacoes": {
+            "anti_length_bias_applied": True,
+            "absence_not_penalized_as_contradiction": True,
+            "independence_of_sentiment_maintained": True,
+            "halo_effect_mitigated": True,
+        },
+    }
+
+    validated = AgenteAnalysisOutput.model_validate(payload)
+    assert validated.analise_dimensional.RD.score == 4
+    assert validated.analise_dimensional.CL.score == 3
+    assert validated.validacoes.halo_effect_mitigated is True

@@ -1,4 +1,4 @@
-.PHONY: help install run test format lint prepare-precommit clean docker-build docker-up docker-down
+.PHONY: help install run test format lint prepare-precommit clean docker-build docker-up docker-down docker-reset db-truncate truncate
 
 # Variáveis
 PYTHON = python3
@@ -47,3 +47,13 @@ docker-down: ## Para e remove os contêineres Docker
 docker-reset:
 	docker compose down -v --remove-orphans
 	docker compose up --build -d
+
+db-truncate: ## Apaga todas as avaliações e reinicia o contador de ID (TRUNCATE + RESTART IDENTITY)
+	@if docker ps --format '{{.Names}}' | grep -q review_postgres; then \
+		docker exec -t review_postgres psql -U postgres -d review_db -c "TRUNCATE TABLE reviews RESTART IDENTITY;" && \
+		echo "✅ Tabela 'reviews' truncada e IDs reiniciados com sucesso no PostgreSQL (Docker)!"; \
+	else \
+		PYTHONPATH=. $(PYTHON) -c "from src.database.sqlalchemy_repository import SQLAlchemyRepository; from sqlalchemy import text; repo = SQLAlchemyRepository(); conn = repo.engine.connect(); conn.execute(text('TRUNCATE TABLE reviews RESTART IDENTITY;')); conn.commit(); conn.close(); print('✅ Tabela reviews truncada via SQLAlchemy!')"; \
+	fi
+
+truncate: db-truncate ## Atalho para db-truncate

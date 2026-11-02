@@ -49,7 +49,7 @@ flowchart LR
 ##  Funcionalidades
 
 -  Envio de reviews em texto livre via formulário web
--  Análise dimensional automática (RD, OB, CL, UT) com scores de 0 a 10
+-  Análise dimensional automática (RD, OB, CL, UT) com scores de 1 a 5 (LLM-as-a-Judge)
 -  Extração de evidências textuais associadas a cada dimensão
 -  Estimativa de confiança e "avaliabilidade" por métrica, evitando respostas artificialmente confiantes
 -  Detecção automática de domínios abordados (produto, logística, atendimento, pagamento etc.)

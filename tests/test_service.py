@@ -141,10 +141,10 @@ def test_export_reviews_to_csv():
                     "dominios_detectados": [{"dominio": "produto", "confianca": 0.9}]
                 },
                 "analise_dimensional": {
-                    "RD": {"score": 8, "justificativa": "Boa descrição"},
-                    "OB": {"score": 7, "justificativa": "Objetivo"},
-                    "CL": {"score": 9, "justificativa": "Coerente"},
-                    "UT": {"score": 8, "justificativa": "Útil"},
+                    "RD": {"score": 4, "justificativa": "Boa descrição"},
+                    "OB": {"score": 4, "justificativa": "Objetivo"},
+                    "CL": {"score": 5, "justificativa": "Coerente"},
+                    "UT": {"score": 4, "justificativa": "Útil"},
                 },
             },
             created_at=datetime(2026, 11, 1, 15, 30, 0),
