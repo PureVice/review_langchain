@@ -8,12 +8,16 @@ from src.service.review_service import ReviewService
 
 
 def test_process_and_save_review():
-    """Testa se o Service executa o Agent e formata os dados para salvar no Repository."""
+    """Testa se o Service executa o Agent e formata os dados e métricas para salvar no Repository."""
     mock_repository = MagicMock()
     mock_agent_function = MagicMock()
 
     mock_agent_function.return_value = ReviewResponse(
-        analysis={"sentimento": "positivo", "score": 10}
+        analysis={"sentimento": "positivo", "score": 10},
+        execution_time=1.25,
+        input_tokens=100,
+        output_tokens=50,
+        total_tokens=150,
     )
 
     service = ReviewService(
@@ -27,6 +31,10 @@ def test_process_and_save_review():
     mock_repository.save.assert_called_once_with(
         review_text="Serviço rápido e eficiente",
         agent_response_str='{"sentimento": "positivo", "score": 10}',
+        execution_time=1.25,
+        input_tokens=100,
+        output_tokens=50,
+        total_tokens=150,
     )
 
 
@@ -49,6 +57,10 @@ def test_process_and_save_review_string_output():
     mock_repository.save.assert_called_once_with(
         review_text="Avaliação descritiva",
         agent_response_str="O texto é apenas uma resposta descritiva.",
+        execution_time=0.0,
+        input_tokens=0,
+        output_tokens=0,
+        total_tokens=0,
     )
 
 
@@ -142,6 +154,81 @@ def test_export_reviews_to_csv():
 
     csv_output = service.export_reviews_to_csv()
     assert "id,content,dominios,rd_score" in csv_output
+    assert "execution_time,input_tokens,output_tokens,total_tokens" in csv_output
     assert "Ótimo fone de ouvido" in csv_output
     assert "produto" in csv_output
     assert "Boa descrição" in csv_output
+
+
+def test_retry_with_exponential_backoff_and_jitter():
+    """Testa se o pipeline aplica retry com backoff exponencial + jitter quando ocorrem falhas transitórias."""
+    mock_repository = MagicMock()
+    mock_agent = MagicMock(
+        side_effect=[
+            RuntimeError("Rate limit 429"),
+            ReviewResponse(analysis={"ok": True}, execution_time=0.5, total_tokens=42),
+        ]
+    )
+
+    service = ReviewService(
+        repository=mock_repository,
+        agent_function=mock_agent,
+        max_retries=2,
+        retry_base_delay=0.001,
+    )
+
+    count = service.process_reviews_batch(["Avaliação com falha transitória"])
+    assert count == 1
+    assert mock_agent.call_count == 2
+    mock_repository.save.assert_called_once()
+
+
+def test_batch_api_strategy_selected_above_threshold():
+    """Testa se a estratégia Gemini Batch API é selecionada para lotes acima do threshold (ex: > 500)."""
+    mock_repository = MagicMock()
+    mock_single_agent = MagicMock()
+    mock_batch_agent = MagicMock(
+        side_effect=lambda reqs: [
+            ReviewResponse(
+                analysis={"batch": True}, execution_time=0.1, total_tokens=10
+            )
+            for _ in reqs
+        ]
+    )
+
+    service = ReviewService(
+        repository=mock_repository,
+        agent_function=mock_single_agent,
+        batch_agent_function=mock_batch_agent,
+        batch_api_threshold=500,
+    )
+
+    reviews_list = [f"Review número {i}" for i in range(501)]
+    count = service.process_reviews_batch(reviews_list)
+
+    assert count == 501
+    mock_batch_agent.assert_called_once()
+    mock_single_agent.assert_not_called()
+    assert mock_repository.save.call_count == 501
+
+
+def test_checkpoint_resume_in_concurrent_pipeline(tmp_path):
+    """Testa se o checkpointing pula avaliações já persistidas e limpa o checkpoint ao concluir."""
+    checkpoint_file = tmp_path / "checkpoint.json"
+    mock_repository = MagicMock()
+    mock_agent = MagicMock(return_value=ReviewResponse(analysis={"ok": True}))
+
+    service = ReviewService(
+        repository=mock_repository,
+        agent_function=mock_agent,
+        checkpoint_path=checkpoint_file,
+    )
+
+    # Simula que o item 0 já foi concluído em uma execução anterior interrompida
+    first_hash = service._review_hash(0, "Review 1")
+    service._update_checkpoint({first_hash})
+
+    count = service.process_reviews_batch(["Review 1", "Review 2"])
+    assert count == 1
+    assert mock_agent.call_count == 1
+    assert not checkpoint_file.exists()

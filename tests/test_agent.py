@@ -63,3 +63,58 @@ def test_analyze_review_api_exception(mock_chat_gemini):
         request = ReviewRequest(review_text="Texto")
         with pytest.raises(Exception, match="API limit exceeded"):
             agent.analyze_review(request)
+
+
+@patch("src.agent.agent.ChatGoogleGenerativeAI")
+def test_analyze_review_with_usage_metadata(mock_chat_gemini):
+    """Testa a extração de contagem de tokens e tempo de execução de uma AIMessage."""
+    mock_ai_msg = MagicMock()
+    mock_ai_msg.content = '```json\n{"score": 9}\n```'
+    mock_ai_msg.usage_metadata = {
+        "input_tokens": 120,
+        "output_tokens": 80,
+        "total_tokens": 200,
+    }
+
+    with patch(
+        "langchain_core.runnables.RunnableSequence.invoke",
+        return_value=mock_ai_msg,
+    ):
+        request = ReviewRequest(review_text="Produto incrível")
+        result = agent.analyze_review(request)
+
+        assert result.analysis == {"score": 9}
+        assert result.input_tokens == 120
+        assert result.output_tokens == 80
+        assert result.total_tokens == 200
+        assert result.execution_time >= 0.0
+
+
+@patch("src.agent.agent.genai.Client")
+def test_analyze_reviews_batch_api_success(mock_client_cls):
+    """Testa o fluxo de lote usando a Gemini Batch API."""
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+
+    mock_resp_item = MagicMock()
+    mock_resp_item.error = None
+    mock_resp_item.response.text = '{"status": "batch_ok"}'
+    mock_resp_item.response.usage_metadata.prompt_token_count = 50
+    mock_resp_item.response.usage_metadata.candidates_token_count = 30
+    mock_resp_item.response.usage_metadata.total_token_count = 80
+
+    mock_batch_job = MagicMock()
+    mock_batch_job.name = "batches/test-123"
+    mock_batch_job.state.value = "JOB_STATE_SUCCEEDED"
+    mock_batch_job.dest.inlined_responses = [mock_resp_item]
+
+    mock_client.batches.create.return_value = mock_batch_job
+
+    reqs = [ReviewRequest(review_text="Review em lote")]
+    results = agent.analyze_reviews_batch_api(reqs, poll_interval=0.01)
+
+    assert len(results) == 1
+    assert results[0].analysis == {"status": "batch_ok"}
+    assert results[0].input_tokens == 50
+    assert results[0].output_tokens == 30
+    assert results[0].total_tokens == 80

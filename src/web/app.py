@@ -12,7 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from src.agent.agent import analyze_review
+from src.agent.agent import analyze_review, analyze_reviews_batch_api
 from src.database.sqlalchemy_repository import SQLAlchemyRepository
 from src.schemas import ReviewRequest
 from src.service.review_service import ReviewService
@@ -36,7 +36,10 @@ swagger = Swagger(app, template=swagger_template)
 
 review_repository = SQLAlchemyRepository()
 review_service = ReviewService(
-    repository=review_repository, agent_function=analyze_review
+    repository=review_repository,
+    agent_function=analyze_review,
+    batch_agent_function=analyze_reviews_batch_api,
+    checkpoint_path=ROOT_DIR / "data" / "checkpoint_batch.json",
 )
 
 

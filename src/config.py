@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     DEBUG: bool = False
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/review_db"
+    BATCH_API_THRESHOLD: int = 500
+    MAX_CONCURRENCY: int = 5
+    MAX_RETRIES: int = 3
+    RETRY_BASE_DELAY: float = 1.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

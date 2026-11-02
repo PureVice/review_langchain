@@ -1,7 +1,7 @@
 import json
 import logging
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from src.config import settings
@@ -29,10 +29,11 @@ class SQLAlchemyRepository(ReviewRepository):
         self._init_db()
 
     def _init_db(self) -> None:
-        """Cria as tabelas no banco de dados caso não existam."""
+        """Cria as tabelas no banco de dados caso não existam e garante migração de colunas."""
         logger.info("Inicializando o banco de dados via SQLAlchemy.")
         try:
             Base.metadata.create_all(bind=self.engine)
+            self._ensure_columns()
             logger.info("Tabelas verificadas/criadas com sucesso no SQLAlchemy.")
         except Exception:
             logger.exception(
@@ -40,13 +41,50 @@ class SQLAlchemyRepository(ReviewRepository):
             )
             raise
 
-    def save(self, review_text: str, agent_response_str: str) -> None:
+    def _ensure_columns(self) -> None:
+        """Adiciona novas colunas de métricas caso a tabela já exista de versões anteriores."""
+        try:
+            inspector = inspect(self.engine)
+            if not inspector.has_table("reviews"):
+                return
+            existing_cols = {col["name"] for col in inspector.get_columns("reviews")}
+            new_columns = {
+                "execution_time": "FLOAT DEFAULT 0.0",
+                "input_tokens": "INTEGER DEFAULT 0",
+                "output_tokens": "INTEGER DEFAULT 0",
+                "total_tokens": "INTEGER DEFAULT 0",
+            }
+            with self.engine.begin() as conn:
+                for col_name, col_type in new_columns.items():
+                    if col_name not in existing_cols:
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE reviews ADD COLUMN {col_name} {col_type}"
+                            )
+                        )
+        except Exception as e:
+            logger.warning("Aviso ao verificar migração de colunas: %s", e)
+
+    def save(
+        self,
+        review_text: str,
+        agent_response_str: str,
+        execution_time: float = 0.0,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        total_tokens: int = 0,
+    ) -> None:
         """Insere um novo registro no banco via ORM."""
         logger.info("Salvando nova avaliação com SQLAlchemy.")
         session = self.SessionLocal()
         try:
             new_review = ReviewModel(
-                review_text=review_text, agent_response=agent_response_str
+                review_text=review_text,
+                agent_response=agent_response_str,
+                execution_time=execution_time,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
             )
             session.add(new_review)
             session.commit()
@@ -105,5 +143,9 @@ class SQLAlchemyRepository(ReviewRepository):
             id=row.id,
             review_text=row.review_text,
             agent_response=parsed_response,
+            execution_time=float(row.execution_time or 0.0),
+            input_tokens=int(row.input_tokens or 0),
+            output_tokens=int(row.output_tokens or 0),
+            total_tokens=int(row.total_tokens or 0),
             created_at=row.created_at,
         )

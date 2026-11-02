@@ -5,7 +5,15 @@ from src.schemas import Review
 
 class ReviewRepository(ABC):
     @abstractmethod
-    def save(self, review_text: str, agent_response_str: str) -> None:
+    def save(
+        self,
+        review_text: str,
+        agent_response_str: str,
+        execution_time: float = 0.0,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        total_tokens: int = 0,
+    ) -> None:
         pass
 
     @abstractmethod

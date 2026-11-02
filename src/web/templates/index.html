@@ -81,14 +81,61 @@
         </div>
         {% endif %}
 
+        {% if entries and not single %}
+        {% set ns = namespace(total_time=0.0, total_tok=0, in_tok=0, out_tok=0) %}
+        {% for item in entries %}
+            {% set ns.total_time = ns.total_time + (item.execution_time or 0.0) %}
+            {% set ns.total_tok = ns.total_tok + (item.total_tokens or 0) %}
+            {% set ns.in_tok = ns.in_tok + (item.input_tokens or 0) %}
+            {% set ns.out_tok = ns.out_tok + (item.output_tokens or 0) %}
+        {% endfor %}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
+                <div class="bg-indigo-50 text-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Avaliações Analisadas</p>
+                    <p class="text-2xl font-bold text-slate-900">{{ entries | length }}</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
+                <div class="bg-amber-50 text-amber-600 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-regular fa-clock"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tempo Médio / Total LLM</p>
+                    <p class="text-2xl font-bold text-slate-900">{{ "%.2f"|format(ns.total_time / (entries | length)) }}s <span class="text-xs font-normal text-slate-400">({{ "%.2f"|format(ns.total_time) }}s total)</span></p>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
+                <div class="bg-emerald-50 text-emerald-600 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-microchip"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tokens Consumidos</p>
+                    <p class="text-2xl font-bold text-slate-900">{{ ns.total_tok }} <span class="text-xs font-normal text-slate-400">(In: {{ ns.in_tok }} | Out: {{ ns.out_tok }})</span></p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <section class="space-y-6">
             {% for entry in entries %}
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 
                 <div class="bg-slate-50 p-6 border-b border-slate-200">
-                    <div class="flex justify-between items-start mb-2">
+                    <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Texto Original (ID: {{ entry.id }})</span>
-                        <span class="text-xs text-slate-400">{{ entry.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium px-2.5 py-1 rounded-lg" title="Tempo de execução da LLM">
+                                <i class="fa-regular fa-clock"></i> {{ "%.2f"|format(entry.execution_time or 0.0) }}s
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-medium px-2.5 py-1 rounded-lg" title="Contagem de tokens (Entrada / Saída / Total)">
+                                <i class="fa-solid fa-microchip"></i> {{ entry.total_tokens or 0 }} tokens (In: {{ entry.input_tokens or 0 }} | Out: {{ entry.output_tokens or 0 }})
+                            </span>
+                            <span class="text-xs text-slate-400 ml-1">{{ entry.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                        </div>
                     </div>
                     <p class="text-slate-700 italic">"{{ entry.review_text }}"</p>
                 </div>
@@ -96,7 +143,7 @@
                 <div class="p-6">
                     {% set data = entry.agent_response %}
 
-                    {% if data and data.get('analise_dimensional') %}
+                    {% if data is mapping and data.get('analise_dimensional') %}
                         <div class="mb-6">
                             <h3 class="text-sm font-bold text-slate-900 mb-3">Domínios Detectados</h3>
                             <div class="flex flex-wrap gap-2">
