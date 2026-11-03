@@ -183,33 +183,45 @@ def test_retry_with_exponential_backoff_and_jitter():
     mock_repository.save.assert_called_once()
 
 
-def test_batch_api_strategy_selected_above_threshold():
-    """Testa se a estratégia Gemini Batch API é selecionada para lotes acima do threshold (ex: > 500)."""
+def test_process_reviews_batch_uses_concurrent_pipeline_and_ignores_batch_api():
+    """Testa se process_reviews_batch utiliza sempre o pipeline concorrente e não aciona batch_agent_function."""
     mock_repository = MagicMock()
-    mock_single_agent = MagicMock()
-    mock_batch_agent = MagicMock(
-        side_effect=lambda reqs: [
-            ReviewResponse(
-                analysis={"batch": True}, execution_time=0.1, total_tokens=10
-            )
-            for _ in reqs
-        ]
+    mock_single_agent = MagicMock(
+        return_value=ReviewResponse(
+            analysis={"pipeline": True}, execution_time=0.1, total_tokens=10
+        )
     )
+    mock_batch_agent = MagicMock()
 
     service = ReviewService(
         repository=mock_repository,
         agent_function=mock_single_agent,
         batch_agent_function=mock_batch_agent,
-        batch_api_threshold=500,
     )
 
-    reviews_list = [f"Review número {i}" for i in range(501)]
+    reviews_list = [f"Review número {i}" for i in range(10)]
     count = service.process_reviews_batch(reviews_list)
 
-    assert count == 501
-    mock_batch_agent.assert_called_once()
-    mock_single_agent.assert_not_called()
-    assert mock_repository.save.call_count == 501
+    assert count == 10
+    mock_batch_agent.assert_not_called()
+    assert mock_single_agent.call_count == 10
+    assert mock_repository.save.call_count == 10
+
+
+def test_process_file_upload_exceeds_max_limit():
+    """Testa se o upload de arquivo com mais de 500 avaliações lança erro de validação."""
+    service = ReviewService(
+        repository=MagicMock(),
+        agent_function=MagicMock(),
+        max_upload_reviews=500,
+    )
+
+    csv_header = "id,content\n"
+    csv_rows = "".join(f"{i},Review número {i}\n" for i in range(501))
+    csv_bytes = (csv_header + csv_rows).encode("utf-8")
+
+    with pytest.raises(ValueError, match="limite máximo permitido por upload é de 500"):
+        service.process_file_upload("reviews.csv", csv_bytes)
 
 
 def test_checkpoint_resume_in_concurrent_pipeline(tmp_path):
@@ -232,3 +244,24 @@ def test_checkpoint_resume_in_concurrent_pipeline(tmp_path):
     assert count == 1
     assert mock_agent.call_count == 1
     assert not checkpoint_file.exists()
+
+
+def test_concurrent_pipeline_normalizes_execution_time_by_workers():
+    """Testa se o pipeline concorrente divide o execution_time pelo número de workers ativos para refletir o wall-clock time."""
+    mock_repository = MagicMock()
+    mock_agent = MagicMock(
+        return_value=ReviewResponse(analysis={"ok": True}, execution_time=10.0)
+    )
+
+    service = ReviewService(
+        repository=mock_repository,
+        agent_function=mock_agent,
+        max_concurrency=5,
+    )
+
+    reviews_list = [f"Review {i}" for i in range(5)]
+    service.process_reviews_batch(reviews_list)
+
+    # Com 5 workers simultâneos e 10.0s por thread, o tempo efetivo por item deve ser 2.0s (soma total = 10.0s reais)
+    for call in mock_repository.save.call_args_list:
+        assert call.kwargs["execution_time"] == 2.0

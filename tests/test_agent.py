@@ -173,3 +173,27 @@ def test_agente_analysis_output_schema_validation():
     assert validated.analise_dimensional.RD.score == 4
     assert validated.analise_dimensional.CL.score == 3
     assert validated.validacoes.halo_effect_mitigated is True
+
+
+@patch("src.agent.agent.ChatOpenAI")
+def test_analyze_review_deepseek_provider(mock_chat_openai):
+    """Testa se analyze_review instancia o ChatOpenAI quando o provedor configurado é deepseek."""
+    from src.config import settings
+
+    mock_llm_instance = MagicMock()
+    mock_chat_openai.return_value = mock_llm_instance
+    original_provider = settings.LLM_PROVIDER
+
+    try:
+        settings.LLM_PROVIDER = "deepseek"
+        with patch(
+            "langchain_core.runnables.RunnableSequence.invoke",
+            return_value='{"score": 5}',
+        ):
+            request = ReviewRequest(review_text="Avaliação usando DeepSeek")
+            result = agent.analyze_review(request)
+
+            mock_chat_openai.assert_called_once()
+            assert result.analysis == {"score": 5}
+    finally:
+        settings.LLM_PROVIDER = original_provider

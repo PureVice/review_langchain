@@ -10,6 +10,7 @@ from google.genai import types
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 
 from src.config import settings
 from src.schemas import ReviewRequest, ReviewResponse
@@ -77,11 +78,24 @@ def analyze_review(request: ReviewRequest) -> ReviewResponse:
         [SystemMessage(content=system_prompt_text), ("human", "{input}")]
     )
 
-    llm = ChatGoogleGenerativeAI(
-        model=settings.GEMINI_MODEL,
-        google_api_key=settings.api_key or None,
-        temperature=0.2,
-    )
+    provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
+    if provider == "deepseek":
+        logger.info("Usando provedor DeepSeek (modelo: %s).", settings.DEEPSEEK_MODEL)
+        llm = ChatOpenAI(
+            model=settings.DEEPSEEK_MODEL,
+            api_key=settings.deepseek_key or None,
+            base_url=settings.deepseek_base_url,
+            temperature=0.2,
+        )
+    else:
+        logger.info(
+            "Usando provedor Google Gemini (modelo: %s).", settings.GEMINI_MODEL
+        )
+        llm = ChatGoogleGenerativeAI(
+            model=settings.GEMINI_MODEL,
+            google_api_key=settings.google_key or None,
+            temperature=0.2,
+        )
 
     chain = prompt | llm
 
@@ -103,6 +117,19 @@ def analyze_review(request: ReviewRequest) -> ReviewResponse:
             else:
                 raw_output = str(content)
             usage = getattr(result, "usage_metadata", None) or {}
+            if not usage and hasattr(result, "response_metadata"):
+                resp_meta = getattr(result, "response_metadata", None) or {}
+                token_usage = (
+                    resp_meta.get("token_usage", {})
+                    if isinstance(resp_meta, dict)
+                    else {}
+                )
+                if token_usage:
+                    usage = {
+                        "input_tokens": token_usage.get("prompt_tokens", 0),
+                        "output_tokens": token_usage.get("completion_tokens", 0),
+                        "total_tokens": token_usage.get("total_tokens", 0),
+                    }
         else:
             raw_output = str(result)
             usage = {}

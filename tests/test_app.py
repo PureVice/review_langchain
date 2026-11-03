@@ -81,6 +81,23 @@ def test_upload_file_empty(mock_upload, client):
     mock_upload.assert_not_called()
 
 
+@patch(
+    "src.web.app.review_service.process_file_upload",
+    side_effect=ValueError("O limite máximo permitido por upload é de 500 avaliações."),
+)
+def test_upload_file_validation_error(mock_upload, client):
+    """Testa redirecionamento com mensagem de erro quando ocorre ValueError no upload."""
+    data = {"file": (io.BytesIO(b"content\nReview"), "test.csv")}
+    response = client.post(
+        "/upload",
+        data=data,
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "error=" in response.location
+
+
 @patch("src.web.app.review_service.export_reviews_to_csv")
 def test_export_csv_route(mock_export, client):
     """Testa o download do dataset no endpoint GET /export/csv."""
@@ -93,3 +110,34 @@ def test_export_csv_route(mock_export, client):
         in response.headers["Content-Disposition"]
     )
     assert "Excelente produto" in response.get_data(as_text=True)
+
+
+def test_update_settings_switch_provider(client):
+    """Testa a troca de provedor de IA (Gemini <-> DeepSeek) via POST /settings."""
+    from src.config import settings
+
+    original_provider = settings.LLM_PROVIDER
+    try:
+        resp_deepseek = client.post(
+            "/settings", data={"llm_provider": "deepseek"}, follow_redirects=False
+        )
+        assert resp_deepseek.status_code == 302
+        assert settings.LLM_PROVIDER == "deepseek"
+        assert "tab=settings" in resp_deepseek.location
+
+        resp_gemini = client.post(
+            "/settings", data={"llm_provider": "gemini"}, follow_redirects=False
+        )
+        assert resp_gemini.status_code == 302
+        assert settings.LLM_PROVIDER == "gemini"
+    finally:
+        settings.LLM_PROVIDER = original_provider
+
+
+def test_update_settings_invalid_provider(client):
+    """Testa rejeição ao enviar um provedor inválido em POST /settings."""
+    response = client.post(
+        "/settings", data={"llm_provider": "invalido"}, follow_redirects=False
+    )
+    assert response.status_code == 302
+    assert "error=" in response.location

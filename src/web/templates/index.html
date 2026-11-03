@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Avaliador de Reviews IA</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        };
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
         function showLoading() {
@@ -15,22 +28,91 @@
             document.getElementById('uploadBtn').classList.add('hidden');
             document.getElementById('uploadLoadingBtn').classList.remove('hidden');
         }
+        function switchTab(tabName) {
+            const reviewsPanel = document.getElementById('tab-panel-reviews');
+            const settingsPanel = document.getElementById('tab-panel-settings');
+            const reviewsBtn = document.getElementById('tab-btn-reviews');
+            const settingsBtn = document.getElementById('tab-btn-settings');
+            if (!reviewsPanel || !settingsPanel) return;
+
+            const activeClasses = ['border-indigo-600', 'text-indigo-600', 'dark:text-indigo-400', 'dark:border-indigo-400'];
+            const inactiveClasses = ['border-transparent', 'text-slate-500', 'hover:text-slate-700', 'dark:text-slate-400', 'dark:hover:text-slate-200'];
+
+            if (tabName === 'settings') {
+                reviewsPanel.classList.add('hidden');
+                settingsPanel.classList.remove('hidden');
+                settingsBtn.classList.add(...activeClasses);
+                settingsBtn.classList.remove(...inactiveClasses);
+                reviewsBtn.classList.remove(...activeClasses);
+                reviewsBtn.classList.add(...inactiveClasses);
+            } else {
+                settingsPanel.classList.add('hidden');
+                reviewsPanel.classList.remove('hidden');
+                reviewsBtn.classList.add(...activeClasses);
+                reviewsBtn.classList.remove(...inactiveClasses);
+                settingsBtn.classList.remove(...activeClasses);
+                settingsBtn.classList.add(...inactiveClasses);
+            }
+        }
+        function setTheme(mode) {
+            localStorage.setItem('theme', mode);
+            if (mode === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            updateThemeButtons();
+        }
+        function updateThemeButtons() {
+            const current = localStorage.getItem('theme') || 'light';
+            const lightBtn = document.getElementById('theme-btn-light');
+            const darkBtn = document.getElementById('theme-btn-dark');
+            const lightCheck = document.getElementById('theme-check-light');
+            const darkCheck = document.getElementById('theme-check-dark');
+            if (!lightBtn || !darkBtn) return;
+
+            if (current === 'dark') {
+                darkBtn.classList.add('ring-2', 'ring-indigo-500', 'border-indigo-500', 'bg-indigo-50/40', 'dark:bg-indigo-950/40');
+                lightBtn.classList.remove('ring-2', 'ring-indigo-500', 'border-indigo-500', 'bg-indigo-50/40', 'dark:bg-indigo-950/40');
+                if (darkCheck) darkCheck.classList.remove('hidden');
+                if (lightCheck) lightCheck.classList.add('hidden');
+            } else {
+                lightBtn.classList.add('ring-2', 'ring-indigo-500', 'border-indigo-500', 'bg-indigo-50/40', 'dark:bg-indigo-950/40');
+                darkBtn.classList.remove('ring-2', 'ring-indigo-500', 'border-indigo-500', 'bg-indigo-50/40', 'dark:bg-indigo-950/40');
+                if (lightCheck) lightCheck.classList.remove('hidden');
+                if (darkCheck) darkCheck.classList.add('hidden');
+            }
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            updateThemeButtons();
+        });
     </script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans min-h-screen p-4 md:p-8 transition-colors duration-200">
 
     <div class="max-w-5xl mx-auto">
-        <header class="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <header class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-slate-900"><i class="fa-solid fa-robot text-indigo-600 mr-2"></i>Avaliador de Reviews</h1>
-                <p class="text-slate-500 mt-1">Análise dimensional de textos utilizando Inteligência Artificial.</p>
+                <h1 class="text-3xl font-bold text-slate-900 dark:text-white">
+                    <i class="fa-solid fa-robot text-indigo-600 dark:text-indigo-400 mr-2"></i>Avaliador de Reviews
+                </h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-1">Análise dimensional de textos utilizando Inteligência Artificial.</p>
             </div>
-            <div class="flex items-center gap-3">
-                <a href="/export/csv" class="text-emerald-700 hover:text-emerald-900 font-medium bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-4 py-2 rounded-lg transition-colors flex items-center">
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" onclick="switchTab('settings')" title="Clique para alterar o modelo na aba Configurações"
+                    class="text-xs font-semibold px-3 py-2 rounded-lg border transition-colors flex items-center gap-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    {% if llm_provider == 'deepseek' %}
+                        IA: DeepSeek ({{ deepseek_model or 'deepseek-chat' }})
+                    {% else %}
+                        IA: Gemini ({{ gemini_model or 'gemini-3.5-flash-lite' }})
+                    {% endif %}
+                </button>
+                <a href="/export/csv" class="text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-200 font-medium bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 px-4 py-2 rounded-lg transition-colors flex items-center">
                     <i class="fa-solid fa-file-csv mr-2"></i>Exportar CSV
                 </a>
                 {% if single %}
-                <a href="/" class="text-indigo-600 hover:text-indigo-800 font-medium bg-indigo-50 px-4 py-2 rounded-lg transition-colors">
+                <a href="/" class="text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 font-medium bg-indigo-50 dark:bg-indigo-950/50 px-4 py-2 rounded-lg transition-colors">
                     <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
                 </a>
                 {% endif %}
@@ -38,204 +120,337 @@
         </header>
 
         {% if not single %}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold mb-4 text-slate-800"><i class="fa-solid fa-pen-to-square text-indigo-600 mr-2"></i>Nova Avaliação</h2>
-                    <form method="POST" action="/analyze" onsubmit="showLoading()">
-                        <textarea name="review_text" rows="4" required
-                            class="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none mb-4"
-                            placeholder="Cole aqui o texto da review para análise..."></textarea>
-
-                        <button type="submit" id="submitBtn" class="w-full md:w-auto bg-indigo-600 text-white font-semibold py-3 px-8 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
-                            Analisar Review
-                        </button>
-
-                        <button type="button" id="loadingBtn" disabled class="hidden w-full md:w-auto bg-indigo-400 text-white font-semibold py-3 px-8 rounded-xl cursor-not-allowed shadow-sm flex items-center justify-center">
-                            <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Processando...
-                        </button>
-                    </form>
-                </div>
-            </section>
-
-            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold mb-2 text-slate-800"><i class="fa-solid fa-file-arrow-up text-indigo-600 mr-2"></i>Importar Arquivo (JSON ou CSV)</h2>
-                    <p class="text-sm text-slate-500 mb-4">Envie um arquivo <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">.json</code> ou <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">.csv</code> contendo o campo <code class="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.5 rounded">content</code> com as reviews para análise.</p>
-                    <form method="POST" action="/upload" enctype="multipart/form-data" onsubmit="showUploadLoading()">
-                        <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 mb-4 bg-slate-50 hover:border-indigo-400 transition-colors">
-                            <input type="file" name="file" accept=".csv,.json,text/csv,application/json" required
-                                class="block w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
-                        </div>
-
-                        <button type="submit" id="uploadBtn" class="w-full md:w-auto bg-indigo-600 text-white font-semibold py-3 px-8 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
-                            <i class="fa-solid fa-upload mr-2"></i>Enviar e Analisar
-                        </button>
-
-                        <button type="button" id="uploadLoadingBtn" disabled class="hidden w-full md:w-auto bg-indigo-400 text-white font-semibold py-3 px-8 rounded-xl cursor-not-allowed shadow-sm flex items-center justify-center">
-                            <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Processando lote...
-                        </button>
-                    </form>
-                </div>
-            </section>
+        <!-- Barra de Abas -->
+        <div class="border-b border-slate-200 dark:border-slate-700 mb-6 flex gap-6">
+            <button type="button" id="tab-btn-reviews" onclick="switchTab('reviews')"
+                class="pb-3 px-1 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 {% if active_tab != 'settings' %}border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400{% else %}border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200{% endif %}">
+                <i class="fa-solid fa-chart-pie"></i> Avaliações
+            </button>
+            <button type="button" id="tab-btn-settings" onclick="switchTab('settings')"
+                class="pb-3 px-1 font-semibold text-sm border-b-2 transition-colors flex items-center gap-2 {% if active_tab == 'settings' %}border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400{% else %}border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200{% endif %}">
+                <i class="fa-solid fa-sliders"></i> Configurações
+            </button>
         </div>
         {% endif %}
 
-        {% if entries and not single %}
-        {% set ns = namespace(total_time=0.0, total_tok=0, in_tok=0, out_tok=0) %}
-        {% for item in entries %}
-            {% set ns.total_time = ns.total_time + (item.execution_time or 0.0) %}
-            {% set ns.total_tok = ns.total_tok + (item.total_tokens or 0) %}
-            {% set ns.in_tok = ns.in_tok + (item.input_tokens or 0) %}
-            {% set ns.out_tok = ns.out_tok + (item.output_tokens or 0) %}
-        {% endfor %}
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-                <div class="bg-indigo-50 text-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
-                    <i class="fa-solid fa-layer-group"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Avaliações Analisadas</p>
-                    <p class="text-2xl font-bold text-slate-900">{{ entries | length }}</p>
-                </div>
+        {% if error %}
+        <div class="bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl mb-6 flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-exclamation text-red-500 text-lg"></i>
+                <span class="font-medium">{{ error }}</span>
             </div>
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-                <div class="bg-amber-50 text-amber-600 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
-                    <i class="fa-regular fa-clock"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tempo Médio / Total LLM</p>
-                    <p class="text-2xl font-bold text-slate-900">{{ "%.2f"|format(ns.total_time / (entries | length)) }}s <span class="text-xs font-normal text-slate-400">({{ "%.2f"|format(ns.total_time) }}s total)</span></p>
-                </div>
-            </div>
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center gap-4">
-                <div class="bg-emerald-50 text-emerald-600 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
-                    <i class="fa-solid fa-microchip"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tokens Consumidos</p>
-                    <p class="text-2xl font-bold text-slate-900">{{ ns.total_tok }} <span class="text-xs font-normal text-slate-400">(In: {{ ns.in_tok }} | Out: {{ ns.out_tok }})</span></p>
-                </div>
-            </div>
+            <a href="/" class="text-red-400 hover:text-red-700 dark:hover:text-red-200 transition-colors ml-4">
+                <i class="fa-solid fa-xmark"></i>
+            </a>
         </div>
         {% endif %}
 
-        <section class="space-y-6">
-            {% for entry in entries %}
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {% if success %}
+        <div class="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 px-4 py-3 rounded-xl mb-6 flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
+                <span class="font-medium">{{ success }}</span>
+            </div>
+            <a href="/?tab={{ active_tab or 'reviews' }}" class="text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-200 transition-colors ml-4">
+                <i class="fa-solid fa-xmark"></i>
+            </a>
+        </div>
+        {% endif %}
 
-                <div class="bg-slate-50 p-6 border-b border-slate-200">
-                    <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Texto Original (ID: {{ entry.id }})</span>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium px-2.5 py-1 rounded-lg" title="Tempo de execução da LLM">
-                                <i class="fa-regular fa-clock"></i> {{ "%.2f"|format(entry.execution_time or 0.0) }}s
+        {% if not single %}
+        <!-- ABA: CONFIGURAÇÕES -->
+        <div id="tab-panel-settings" class="{% if active_tab != 'settings' %}hidden{% endif %} space-y-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Card: Tema Claro / Escuro -->
+                <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                    <h2 class="text-xl font-semibold mb-2 text-slate-800 dark:text-white flex items-center gap-2">
+                        <i class="fa-solid fa-palette text-indigo-600 dark:text-indigo-400"></i> Aparência da Página
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                        Escolha entre o tema claro ou escuro para melhor conforto visual. A preferência fica salva no seu navegador.
+                    </p>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <button type="button" id="theme-btn-light" onclick="setTheme('light')"
+                            class="relative flex flex-col items-center justify-center p-5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-400 transition-all text-center cursor-pointer">
+                            <span id="theme-check-light" class="hidden absolute top-3 right-3 text-indigo-600 dark:text-indigo-400">
+                                <i class="fa-solid fa-circle-check"></i>
                             </span>
-                            <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-medium px-2.5 py-1 rounded-lg" title="Contagem de tokens (Entrada / Saída / Total)">
-                                <i class="fa-solid fa-microchip"></i> {{ entry.total_tokens or 0 }} tokens (In: {{ entry.input_tokens or 0 }} | Out: {{ entry.output_tokens or 0 }})
+                            <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-500 flex items-center justify-center text-2xl mb-3">
+                                <i class="fa-solid fa-sun"></i>
+                            </div>
+                            <span class="font-semibold text-slate-800 dark:text-slate-100">Tema Claro</span>
+                            <span class="text-xs text-slate-400 mt-1">Fundo claro padrão</span>
+                        </button>
+
+                        <button type="button" id="theme-btn-dark" onclick="setTheme('dark')"
+                            class="relative flex flex-col items-center justify-center p-5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-400 transition-all text-center cursor-pointer">
+                            <span id="theme-check-dark" class="hidden absolute top-3 right-3 text-indigo-600 dark:text-indigo-400">
+                                <i class="fa-solid fa-circle-check"></i>
                             </span>
-                            <span class="text-xs text-slate-400 ml-1">{{ entry.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
-                        </div>
+                            <div class="w-12 h-12 rounded-full bg-slate-700 text-indigo-300 flex items-center justify-center text-2xl mb-3">
+                                <i class="fa-solid fa-moon"></i>
+                            </div>
+                            <span class="font-semibold text-slate-800 dark:text-slate-100">Tema Escuro</span>
+                            <span class="text-xs text-slate-400 mt-1">Conforto noturno</span>
+                        </button>
                     </div>
-                    <p class="text-slate-700 italic">"{{ entry.review_text }}"</p>
-                </div>
+                </section>
 
-                <div class="p-6">
-                    {% set data = entry.agent_response %}
+                <!-- Card: Escolha do Modelo LLM (Gemini vs DeepSeek) -->
+                <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                    <h2 class="text-xl font-semibold mb-2 text-slate-800 dark:text-white flex items-center gap-2">
+                        <i class="fa-solid fa-brain text-indigo-600 dark:text-indigo-400"></i> Provedor de Inteligência Artificial
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                        Selecione qual motor de LLM será utilizado pelo agente para analisar as avaliações individuais e lotes CSV/JSON.
+                    </p>
 
-                    {% if data is mapping and data.get('analise_dimensional') %}
-                        <div class="mb-6">
-                            <h3 class="text-sm font-bold text-slate-900 mb-3">Domínios Detectados</h3>
-                            <div class="flex flex-wrap gap-2">
-                                {% for dom in data.metadados.dominios_detectados %}
-                                    <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-3 py-1 rounded-full border border-indigo-200">
-                                        {{ dom.dominio | capitalize }} (Conf: {{ dom.confianca }})
+                    <form method="POST" action="/settings" class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label class="relative flex flex-col p-4 rounded-xl border cursor-pointer transition-all {% if llm_provider != 'deepseek' %}border-indigo-500 ring-2 ring-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/40{% else %}border-slate-200 dark:border-slate-700 hover:border-indigo-400{% endif %}">
+                                <input type="radio" name="llm_provider" value="gemini" class="sr-only" onchange="this.form.submit()" {% if llm_provider != 'deepseek' %}checked{% endif %}>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        <i class="fa-brands fa-google text-indigo-600 dark:text-indigo-400"></i> Google Gemini
                                     </span>
-                                {% endfor %}
+                                    {% if llm_provider != 'deepseek' %}
+                                    <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-semibold">Ativo</span>
+                                    {% endif %}
+                                </div>
+                                <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ gemini_model or 'gemini-3.5-flash-lite' }}</span>
+                                <span class="text-xs text-slate-400 mt-2">Rápido e otimizado via Google GenAI.</span>
+                            </label>
+
+                            <label class="relative flex flex-col p-4 rounded-xl border cursor-pointer transition-all {% if llm_provider == 'deepseek' %}border-indigo-500 ring-2 ring-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/40{% else %}border-slate-200 dark:border-slate-700 hover:border-indigo-400{% endif %}">
+                                <input type="radio" name="llm_provider" value="deepseek" class="sr-only" onchange="this.form.submit()" {% if llm_provider == 'deepseek' %}checked{% endif %}>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        <i class="fa-solid fa-microchip text-indigo-600 dark:text-indigo-400"></i> DeepSeek
+                                    </span>
+                                    {% if llm_provider == 'deepseek' %}
+                                    <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-semibold">Ativo</span>
+                                    {% endif %}
+                                </div>
+                                <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ deepseek_model or 'deepseek-chat' }}</span>
+                                <span class="text-xs text-slate-400 mt-2">Alta precisão analítica via API compatível OpenAI.</span>
+                            </label>
+                        </div>
+
+                        <div class="pt-2 flex justify-end">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 px-6 rounded-xl transition-colors shadow-sm">
+                                <i class="fa-solid fa-floppy-disk mr-2"></i>Salvar Provedor
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ABA: AVALIAÇÕES -->
+        <div id="tab-panel-reviews" class="{% if not single and active_tab == 'settings' %}hidden{% endif %}">
+            {% if not single %}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold mb-4 text-slate-800 dark:text-white"><i class="fa-solid fa-pen-to-square text-indigo-600 dark:text-indigo-400 mr-2"></i>Nova Avaliação</h2>
+                        <form method="POST" action="/analyze" onsubmit="showLoading()">
+                            <textarea name="review_text" rows="4" required
+                                class="w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-xl p-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none mb-4 placeholder-slate-400 dark:placeholder-slate-500"
+                                placeholder="Cole aqui o texto da review para análise..."></textarea>
+
+                            <button type="submit" id="submitBtn" class="w-full md:w-auto bg-indigo-600 text-white font-semibold py-3 px-8 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                                Analisar Review
+                            </button>
+
+                            <button type="button" id="loadingBtn" disabled class="hidden w-full md:w-auto bg-indigo-400 text-white font-semibold py-3 px-8 rounded-xl cursor-not-allowed shadow-sm flex items-center justify-center">
+                                <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Processando...
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold mb-2 text-slate-800 dark:text-white"><i class="fa-solid fa-file-arrow-up text-indigo-600 dark:text-indigo-400 mr-2"></i>Importar Arquivo (JSON ou CSV)</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Envie um arquivo <code class="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200">.json</code> ou <code class="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200">.csv</code> (máximo de <strong>500 avaliações</strong>) contendo o campo <code class="bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-semibold px-1.5 py-0.5 rounded">content</code> com as reviews para análise.</p>
+                        <form method="POST" action="/upload" enctype="multipart/form-data" onsubmit="showUploadLoading()">
+                            <div class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-4 mb-4 bg-slate-50 dark:bg-slate-900/50 hover:border-indigo-400 transition-colors">
+                                <input type="file" name="file" accept=".csv,.json,text/csv,application/json" required
+                                    class="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-950 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 cursor-pointer">
                             </div>
-                        </div>
 
-                        <h3 class="text-sm font-bold text-slate-900 mb-3">Análise Dimensional</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            {% for dim, details in data.analise_dimensional.items() %}
-                            {% set max_scale = 10 if (details.score and details.score > 5) else 5 %}
-                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="font-bold text-slate-800">{{ dim }}</span>
-                                    <span class="text-lg font-black text-indigo-600">{{ details.score }}/{{ max_scale }}</span>
-                                </div>
+                            <button type="submit" id="uploadBtn" class="w-full md:w-auto bg-indigo-600 text-white font-semibold py-3 px-8 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                                <i class="fa-solid fa-upload mr-2"></i>Enviar e Analisar
+                            </button>
 
-                                <div class="w-full bg-slate-200 rounded-full h-2 mb-3">
-                                    <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ [((details.score / max_scale) * 100)|int, 100]|min }}%"></div>
-                                </div>
+                            <button type="button" id="uploadLoadingBtn" disabled class="hidden w-full md:w-auto bg-indigo-400 text-white font-semibold py-3 px-8 rounded-xl cursor-not-allowed shadow-sm flex items-center justify-center">
+                                <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Processando lote...
+                            </button>
+                        </form>
+                    </div>
+                </section>
+            </div>
+            {% endif %}
 
-                                <p class="text-sm text-slate-600 mb-2">{{ details.justificativa }}</p>
-                                <div class="flex gap-4 text-xs text-slate-400">
-                                    <span>Confiança: {{ details.confianca }}</span>
-                                    <span>Avaliabilidade: {{ details.avaliabilidade }}</span>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-
-                        {% if data.validacoes %}
-                        <div class="mb-6 p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-wrap items-center gap-2 text-xs">
-                            <span class="font-bold text-slate-700 mr-1"><i class="fa-solid fa-shield-halved text-indigo-500 mr-1"></i> Auditoria de Vieses:</span>
-                            {% if data.validacoes.anti_length_bias_applied %}
-                                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium">✓ Anti-viés extensão</span>
-                            {% endif %}
-                            {% if data.validacoes.absence_not_penalized_as_contradiction %}
-                                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium">✓ Lacuna não penalizada (CL)</span>
-                            {% endif %}
-                            {% if data.validacoes.independence_of_sentiment_maintained %}
-                                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium">✓ Independência de sentimento</span>
-                            {% endif %}
-                            {% if data.validacoes.halo_effect_mitigated %}
-                                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium">✓ Efeito Halo mitigado</span>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-
-                        {% if data.evidencias_estruturadas %}
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-3">Evidências Extraídas</h3>
-                            <ul class="space-y-2">
-                                {% for ev in data.evidencias_estruturadas %}
-                                <li class="text-sm border-l-4 border-indigo-400 pl-3 py-1 bg-slate-50">
-                                    <span class="font-semibold text-slate-700">"{{ ev.trecho }}"</span>
-                                    <div class="text-xs text-slate-500 mt-1">
-                                        Dimensões: {{ ev.dimensoes | join(', ') }} | Polaridade: {{ ev.polaridade_relato }}
-                                    </div>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        {% endif %}
-
-                        {% if not single %}
-                        <div class="mt-6 text-right">
-                            <a href="/review/{{ entry.id }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 underline">
-                                Ver análise completa
-                            </a>
-                        </div>
-                        {% endif %}
-
-                    {% else %}
-                        <div class="bg-red-50 text-red-800 p-4 rounded-xl border border-red-200">
-                            <p class="text-sm font-bold mb-2">Resposta bruta (O agente não retornou o JSON padrão):</p>
-                            <pre class="whitespace-pre-wrap text-xs font-mono overflow-auto max-h-64">{{ data }}</pre>
-                        </div>
-                    {% endif %}
+            {% if entries and not single %}
+            {% set ns = namespace(total_time=0.0, total_tok=0, in_tok=0, out_tok=0) %}
+            {% for item in entries %}
+                {% set ns.total_time = ns.total_time + (item.execution_time or 0.0) %}
+                {% set ns.total_tok = ns.total_tok + (item.total_tokens or 0) %}
+                {% set ns.in_tok = ns.in_tok + (item.input_tokens or 0) %}
+                {% set ns.out_tok = ns.out_tok + (item.output_tokens or 0) %}
+            {% endfor %}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 flex items-center gap-4">
+                    <div class="bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Avaliações Analisadas</p>
+                        <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ entries | length }}</p>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 flex items-center gap-4">
+                    <div class="bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-regular fa-clock"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tempo Médio / Total LLM</p>
+                        <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ "%.2f"|format(ns.total_time / (entries | length)) }}s <span class="text-xs font-normal text-slate-400">({{ "%.2f"|format(ns.total_time) }}s{% if ns.total_time >= 60 %} / {{ "%.1f"|format(ns.total_time / 60) }} min{% endif %} total)</span></p>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 flex items-center gap-4">
+                    <div class="bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 w-12 h-12 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-microchip"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tokens Consumidos</p>
+                        <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ ns.total_tok }} <span class="text-xs font-normal text-slate-400">(In: {{ ns.in_tok }} | Out: {{ ns.out_tok }})</span></p>
+                    </div>
                 </div>
             </div>
-            {% else %}
-            <div class="text-center py-12 bg-white rounded-2xl shadow-sm border border-slate-200">
-                <i class="fa-solid fa-inbox text-4xl text-slate-300 mb-3"></i>
-                <h3 class="text-lg font-medium text-slate-900">Nenhuma avaliação encontrada</h3>
-                <p class="text-slate-500">Envie uma review acima para começar a preencher sua base de dados.</p>
-            </div>
-            {% endfor %}
-        </section>
+            {% endif %}
+
+            <section class="space-y-6">
+                {% for entry in entries %}
+                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+
+                    <div class="bg-slate-50 dark:bg-slate-800/60 p-6 border-b border-slate-200 dark:border-slate-700">
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Texto Original (ID: {{ entry.id }})</span>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-medium px-2.5 py-1 rounded-lg" title="Tempo de execução da LLM">
+                                    <i class="fa-regular fa-clock"></i> {{ "%.2f"|format(entry.execution_time or 0.0) }}s
+                                </span>
+                                <span class="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-medium px-2.5 py-1 rounded-lg" title="Contagem de tokens (Entrada / Saída / Total)">
+                                    <i class="fa-solid fa-microchip"></i> {{ entry.total_tokens or 0 }} tokens (In: {{ entry.input_tokens or 0 }} | Out: {{ entry.output_tokens or 0 }})
+                                </span>
+                                <span class="text-xs text-slate-400 ml-1">{{ entry.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                            </div>
+                        </div>
+                        <p class="text-slate-700 dark:text-slate-200 italic">"{{ entry.review_text }}"</p>
+                    </div>
+
+                    <div class="p-6">
+                        {% set data = entry.agent_response %}
+
+                        {% if data is mapping and data.get('analise_dimensional') %}
+                            <div class="mb-6">
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white mb-3">Domínios Detectados</h3>
+                                <div class="flex flex-wrap gap-2">
+                                    {% for dom in data.metadados.dominios_detectados %}
+                                        <span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 text-xs font-semibold px-3 py-1 rounded-full border border-indigo-200 dark:border-indigo-800">
+                                            {{ dom.dominio | capitalize }} (Conf: {{ dom.confianca }})
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white mb-3">Análise Dimensional</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                {% for dim, details in data.analise_dimensional.items() %}
+                                {% set max_scale = 10 if (details.score and details.score > 5) else 5 %}
+                                <div class="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="font-bold text-slate-800 dark:text-slate-100">{{ dim }}</span>
+                                        <span class="text-lg font-black text-indigo-600 dark:text-indigo-400">{{ details.score }}/{{ max_scale }}</span>
+                                    </div>
+
+                                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-3">
+                                        <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ [((details.score / max_scale) * 100)|int, 100]|min }}%"></div>
+                                    </div>
+
+                                    <p class="text-sm text-slate-600 dark:text-slate-300 mb-2">{{ details.justificativa }}</p>
+                                    <div class="flex gap-4 text-xs text-slate-400">
+                                        <span>Confiança: {{ details.confianca }}</span>
+                                        <span>Avaliabilidade: {{ details.avaliabilidade }}</span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            {% if data.validacoes %}
+                            <div class="mb-6 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700 flex flex-wrap items-center gap-2 text-xs">
+                                <span class="font-bold text-slate-700 dark:text-slate-200 mr-1"><i class="fa-solid fa-shield-halved text-indigo-500 mr-1"></i> Auditoria de Vieses:</span>
+                                {% if data.validacoes.anti_length_bias_applied %}
+                                    <span class="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded font-medium">✓ Anti-viés extensão</span>
+                                {% endif %}
+                                {% if data.validacoes.absence_not_penalized_as_contradiction %}
+                                    <span class="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded font-medium">✓ Lacuna não penalizada (CL)</span>
+                                {% endif %}
+                                {% if data.validacoes.independence_of_sentiment_maintained %}
+                                    <span class="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded font-medium">✓ Independência de sentimento</span>
+                                {% endif %}
+                                {% if data.validacoes.halo_effect_mitigated %}
+                                    <span class="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded font-medium">✓ Efeito Halo mitigado</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                            {% if data.evidencias_estruturadas %}
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white mb-3">Evidências Extraídas</h3>
+                                <ul class="space-y-2">
+                                    {% for ev in data.evidencias_estruturadas %}
+                                    <li class="text-sm border-l-4 border-indigo-400 pl-3 py-1 bg-slate-50 dark:bg-slate-900/50">
+                                        <span class="font-semibold text-slate-700 dark:text-slate-200">"{{ ev.trecho }}"</span>
+                                        <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            Dimensões: {{ ev.dimensoes | join(', ') }} | Polaridade: {{ ev.polaridade_relato }}
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            {% if not single %}
+                            <div class="mt-6 text-right">
+                                <a href="/review/{{ entry.id }}" class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 underline">
+                                    Ver análise completa
+                                </a>
+                            </div>
+                            {% endif %}
+
+                        {% else %}
+                            <div class="bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-300 p-4 rounded-xl border border-red-200 dark:border-red-800">
+                                <p class="text-sm font-bold mb-2">Resposta bruta (O agente não retornou o JSON padrão):</p>
+                                <pre class="whitespace-pre-wrap text-xs font-mono overflow-auto max-h-64">{{ data }}</pre>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <i class="fa-solid fa-inbox text-4xl text-slate-300 dark:text-slate-600 mb-3"></i>
+                    <h3 class="text-lg font-medium text-slate-900 dark:text-white">Nenhuma avaliação encontrada</h3>
+                    <p class="text-slate-500 dark:text-slate-400">Envie uma review acima para começar a preencher sua base de dados.</p>
+                </div>
+                {% endfor %}
+            </section>
+        </div>
+
     </div>
 </body>
 </html>

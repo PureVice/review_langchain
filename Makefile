@@ -35,23 +35,24 @@ clean: ## Remove arquivos temporários, caches do Python e do Pytest
 	rm -rf .pytest_cache
 	rm -rf .coverage
 
-docker-build: ## Constrói a imagem Docker via docker-compose
-	docker-compose build
+docker-build: ## Constrói a imagem Docker via docker compose
+	docker compose build
 
 docker-up: ## Sobe a aplicação em contêineres Docker em segundo plano
-	docker-compose up -d
+	docker compose up -d
 
 docker-down: ## Para e remove os contêineres Docker
-	docker-compose down --remove-orphans
+	docker compose down --remove-orphans
 
-docker-reset:
+docker-reset: ## Recria os contêineres e volumes do zero
 	docker compose down -v --remove-orphans
 	docker compose up --build -d
 
 db-truncate: ## Apaga todas as avaliações e reinicia o contador de ID (TRUNCATE + RESTART IDENTITY)
-	@if docker ps --format '{{.Names}}' | grep -q review_postgres; then \
-		docker exec -t review_postgres psql -U postgres -d review_db -c "TRUNCATE TABLE reviews RESTART IDENTITY;" && \
-		echo "✅ Tabela 'reviews' truncada e IDs reiniciados com sucesso no PostgreSQL (Docker)!"; \
+	@CONTAINER=$$(docker ps --format '{{.Names}}' | grep review_postgres | head -n 1); \
+	if [ -n "$$CONTAINER" ]; then \
+		docker exec -t $$CONTAINER psql -U postgres -d review_db -c "TRUNCATE TABLE reviews RESTART IDENTITY;" && \
+		echo "✅ Tabela 'reviews' truncada e IDs reiniciados com sucesso no PostgreSQL (Docker: $$CONTAINER)!"; \
 	else \
 		PYTHONPATH=. $(PYTHON) -c "from src.database.sqlalchemy_repository import SQLAlchemyRepository; from sqlalchemy import text; repo = SQLAlchemyRepository(); conn = repo.engine.connect(); conn.execute(text('TRUNCATE TABLE reviews RESTART IDENTITY;')); conn.commit(); conn.close(); print('✅ Tabela reviews truncada via SQLAlchemy!')"; \
 	fi

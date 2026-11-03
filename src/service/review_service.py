@@ -31,6 +31,7 @@ class ReviewService:
         max_retries: int | None = None,
         retry_base_delay: float | None = None,
         checkpoint_path: Path | None = None,
+        max_upload_reviews: int | None = None,
     ):
         """
         Recebe o repositório, funções do agente e configurações de pipeline/lote via injeção de dependência.
@@ -42,6 +43,11 @@ class ReviewService:
             batch_api_threshold
             if batch_api_threshold is not None
             else settings.BATCH_API_THRESHOLD
+        )
+        self.max_upload_reviews = (
+            max_upload_reviews
+            if max_upload_reviews is not None
+            else getattr(settings, "MAX_UPLOAD_REVIEWS", 500)
         )
         self.max_concurrency = (
             max_concurrency if max_concurrency is not None else settings.MAX_CONCURRENCY
@@ -255,6 +261,13 @@ class ReviewService:
                 item_hash, req = future_to_item[future]
                 try:
                     agent_response = future.result()
+                    if workers > 1 and agent_response.execution_time:
+                        effective_time = round(
+                            agent_response.execution_time / workers, 4
+                        )
+                        agent_response = agent_response.model_copy(
+                            update={"execution_time": effective_time}
+                        )
                     # Checkpointing de persistência imediata assim que cada worker conclui
                     self._persist_review(req.review_text, agent_response)
                     with self._persistence_lock:
@@ -289,9 +302,8 @@ class ReviewService:
 
     def process_reviews_batch(self, review_texts: list[str]) -> int:
         """
-        Seleciona automaticamente a estratégia ótima de processamento:
-        - Acima de 500 reviews (batch_api_threshold): Gemini Batch API
-        - Até 500 reviews: Pipeline com concorrência fixa, retry exponencial com jitter e persistência imediata.
+        Executa o lote de avaliações utilizando o pipeline concorrente com
+        concorrência fixa, retry exponencial com jitter e persistência imediata.
         """
         requests = [
             ReviewRequest(review_text=t.strip()) for t in review_texts if t.strip()
@@ -299,13 +311,12 @@ class ReviewService:
         if not requests:
             return 0
 
-        if len(requests) > self.batch_api_threshold:
-            return self._process_batch_api(requests)
         return self._process_concurrent_pipeline(requests)
 
     def process_file_upload(self, filename: str, raw_bytes: bytes) -> int:
         """
         Lê um arquivo CSV ou JSON, extrai as avaliações do campo 'content' e processa o lote.
+        Limita a quantidade de avaliações a max_upload_reviews (padrão 500).
         Retorna a quantidade de avaliações processadas.
         """
         lower_name = (filename or "").lower()
@@ -318,6 +329,12 @@ class ReviewService:
         else:
             raise ValueError(
                 "Formato de arquivo não suportado. Envie um arquivo .csv ou .json."
+            )
+
+        if len(reviews) > self.max_upload_reviews:
+            raise ValueError(
+                f"O arquivo contém {len(reviews)} avaliações. "
+                f"O limite máximo permitido por upload é de {self.max_upload_reviews} avaliações."
             )
 
         processed_count = self.process_reviews_batch(reviews)

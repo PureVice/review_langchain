@@ -12,7 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from src.agent.agent import analyze_review, analyze_reviews_batch_api
+from src.agent.agent import analyze_review
 from src.database.sqlalchemy_repository import SQLAlchemyRepository
 from src.schemas import ReviewRequest
 from src.service.review_service import ReviewService
@@ -38,8 +38,8 @@ review_repository = SQLAlchemyRepository()
 review_service = ReviewService(
     repository=review_repository,
     agent_function=analyze_review,
-    batch_agent_function=analyze_reviews_batch_api,
     checkpoint_path=ROOT_DIR / "data" / "checkpoint_batch.json",
+    max_upload_reviews=settings.MAX_UPLOAD_REVIEWS,
 )
 
 
@@ -56,7 +56,62 @@ def index():
     """
     logger.info("Requisição GET recebida no endpoint '/'.")
     entries = review_service.get_all_reviews()
-    return render_template("index.html", entries=entries, single=False)
+    error = request.args.get("error")
+    success = request.args.get("success")
+    active_tab = request.args.get("tab", "reviews")
+    return render_template(
+        "index.html",
+        entries=entries,
+        single=False,
+        error=error,
+        success=success,
+        active_tab=active_tab,
+        llm_provider=(settings.LLM_PROVIDER or "gemini").strip().lower(),
+        gemini_model=settings.GEMINI_MODEL,
+        deepseek_model=settings.DEEPSEEK_MODEL,
+    )
+
+
+@app.route("/settings", methods=["POST"])
+def update_settings():
+    """
+    Atualiza as configurações da aplicação (ex: provedor LLM entre Gemini e DeepSeek).
+    ---
+    tags:
+      - Settings
+    consumes:
+      - application/x-www-form-urlencoded
+    parameters:
+      - name: llm_provider
+        in: formData
+        type: string
+        required: true
+        enum: [gemini, deepseek]
+        description: Provedor de LLM selecionado ('gemini' ou 'deepseek').
+    responses:
+      302:
+        description: Redireciona para a aba de configurações.
+    """
+    provider = request.form.get("llm_provider", "").strip().lower()
+    if provider not in ("gemini", "deepseek"):
+        return redirect(
+            url_for(
+                "index",
+                tab="settings",
+                error="Provedor de IA inválido. Escolha 'gemini' ou 'deepseek'.",
+            )
+        )
+
+    settings.LLM_PROVIDER = provider
+    provider_label = "Google Gemini" if provider == "gemini" else "DeepSeek"
+    logger.info("Provedor LLM alterado via interface para: %s", provider)
+    return redirect(
+        url_for(
+            "index",
+            tab="settings",
+            success=f"Modelo de IA alterado para {provider_label} com sucesso!",
+        )
+    )
 
 
 @app.route("/review/<int:review_id>", methods=["GET"])
@@ -87,7 +142,14 @@ def show_review(review_id):
         )
         return redirect(url_for("index"))
 
-    return render_template("index.html", entries=[entry], single=True)
+    return render_template(
+        "index.html",
+        entries=[entry],
+        single=True,
+        llm_provider=(settings.LLM_PROVIDER or "gemini").strip().lower(),
+        gemini_model=settings.GEMINI_MODEL,
+        deepseek_model=settings.DEEPSEEK_MODEL,
+    )
 
 
 @app.route("/analyze", methods=["POST"])
@@ -117,8 +179,14 @@ def analyze():
         review_service.process_and_save_review(review_request)
     except ValidationError as ve:
         logger.warning("Falha na validação dos dados de entrada (Pydantic): %s", ve)
+        return redirect(
+            url_for("index", error="O texto da avaliação não pode estar vazio.")
+        )
     except Exception:
         logger.exception("Erro ao processar e armazenar a avaliação enviada.")
+        return redirect(
+            url_for("index", error="Erro ao processar a avaliação com o modelo de IA.")
+        )
 
     return redirect(url_for("index"))
 
@@ -147,15 +215,21 @@ def upload_file():
 
     if not uploaded or not uploaded.filename:
         logger.warning("Nenhum arquivo enviado no endpoint '/upload'.")
-        return redirect(url_for("index"))
+        return redirect(
+            url_for("index", error="Nenhum arquivo selecionado para upload.")
+        )
 
     try:
         raw_bytes = uploaded.read()
         review_service.process_file_upload(uploaded.filename, raw_bytes)
     except ValueError as ve:
         logger.warning("Erro de validação no arquivo enviado: %s", ve)
+        return redirect(url_for("index", error=str(ve)))
     except Exception:
         logger.exception("Erro ao processar o arquivo enviado no upload.")
+        return redirect(
+            url_for("index", error="Ocorreu um erro ao processar o arquivo enviado.")
+        )
 
     return redirect(url_for("index"))
 
