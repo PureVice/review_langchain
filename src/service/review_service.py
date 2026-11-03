@@ -18,6 +18,195 @@ from src.schemas import Review, ReviewRequest, ReviewResponse
 logger = logging.getLogger(__name__)
 
 
+def _collect_error_signals(exc: Exception) -> str:
+    """Coleta nomes de classes e mensagens de toda a cadeia de exceções em letras minúsculas."""
+    parts: list[str] = []
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        parts.append(type(current).__name__)
+        parts.append(str(current))
+        current = current.__cause__ or current.__context__
+    return " | ".join(parts).lower()
+
+
+def describe_processing_error(exc: Exception, is_batch: bool = True) -> str:
+    """
+    Traduz exceções ocorridas durante o envio/processamento de avaliações ou lotes
+    em mensagens claras e detalhadas para o usuário.
+    """
+    signals = _collect_error_signals(exc)
+    raw_detail = str(exc).strip() or type(exc).__name__
+
+    if any(
+        token in signals
+        for token in (
+            "402",
+            "insufficient_balance",
+            "insufficient balance",
+            "insufficient_quota",
+            "payment required",
+            "billing",
+        )
+    ):
+        base_msg = (
+            "Saldo ou créditos insuficientes na conta da API de IA (Erro 402): "
+            "verifique seu saldo ou faturamento no painel do provedor."
+        )
+    elif any(
+        token in signals
+        for token in (
+            "429",
+            "rate limit",
+            "ratelimit",
+            "rate_limit",
+            "resource_exhausted",
+            "resourceexhausted",
+            "quota",
+            "too many requests",
+            "requests per minute",
+            "tokens per minute",
+        )
+    ):
+        base_msg = (
+            "Limite da API excedido (Erro 429 / Rate Limit ou cota esgotada): "
+            "o provedor de IA recusou novas requisições. Aguarde alguns instantes "
+            "ou verifique o limite do seu plano."
+        )
+    elif any(
+        token in signals
+        for token in (
+            "401",
+            "403",
+            "api_key",
+            "api key",
+            "apikey",
+            "invalid_api_key",
+            "authentication",
+            "unauthorized",
+            "unauthenticated",
+            "permission_denied",
+            "permissiondenied",
+            "forbidden",
+            "credentials",
+        )
+    ):
+        base_msg = (
+            "Falha de autenticação na API de IA (Erro 401/403): chave de API inválida, "
+            "ausente ou sem permissão. Verifique suas chaves GOOGLE_API_KEY / DEEPSEEK_API_KEY."
+        )
+    elif any(
+        token in signals
+        for token in (
+            "context_length",
+            "maximum context",
+            "token limit",
+            "max_tokens",
+            "too many tokens",
+            "payload too large",
+            "request too large",
+            "413",
+            "string too long",
+        )
+    ):
+        base_msg = (
+            "Limite de tokens/contexto da API excedido: o texto enviado ultrapassa "
+            "o tamanho máximo suportado pelo modelo de IA."
+        )
+    elif isinstance(exc, TimeoutError) or any(
+        token in signals
+        for token in (
+            "timeout",
+            "timed out",
+            "deadline_exceeded",
+            "deadlineexceeded",
+            "504",
+            "gateway timeout",
+        )
+    ):
+        base_msg = (
+            "Tempo limite de resposta da API excedido (Timeout): o servidor de IA "
+            "demorou muito para responder. Tente novamente."
+        )
+    elif isinstance(exc, ConnectionError) or any(
+        token in signals
+        for token in (
+            "connection",
+            "connecterror",
+            "network",
+            "dns",
+            "unreachable",
+            "502",
+            "503",
+            "500",
+            "service unavailable",
+            "bad gateway",
+            "overloaded",
+            "server error",
+            "internal server error",
+        )
+    ):
+        base_msg = (
+            "Falha de conexão ou indisponibilidade no servidor da API de IA (Erro de rede / 5xx). "
+            "Verifique sua conexão ou tente novamente em instantes."
+        )
+    elif any(
+        token in signals
+        for token in (
+            "404",
+            "model_not_found",
+            "not_found",
+            "not found",
+            "does not exist",
+        )
+    ):
+        base_msg = (
+            "Modelo de IA não encontrado ou indisponível no provedor (Erro 404). "
+            "Verifique a configuração do modelo."
+        )
+    elif any(
+        token in signals
+        for token in (
+            "safety",
+            "content_filter",
+            "content filter",
+            "blocked",
+            "harm_category",
+            "recitation",
+        )
+    ):
+        base_msg = "O processamento foi bloqueado pelo filtro de segurança/conteúdo da API de IA."
+    elif any(
+        token in signals
+        for token in (
+            "sqlalchemy",
+            "sqlite",
+            "postgres",
+            "psycopg",
+            "operationalerror",
+            "integrityerror",
+            "database",
+            "db error",
+        )
+    ):
+        base_msg = "Erro no banco de dados ao salvar as avaliações processadas."
+    else:
+        context_label = "o lote de avaliações" if is_batch else "a avaliação"
+        base_msg = f"Erro ao processar {context_label}: {raw_detail}"
+
+    if is_batch:
+        processed = getattr(exc, "processed_count", 0)
+        total = getattr(exc, "total_count", 0)
+        if processed and total:
+            base_msg = (
+                f"{base_msg} ({processed} de {total} avaliações do lote já haviam "
+                f"sido salvas antes da interrupção.)"
+            )
+
+    return base_msg
+
+
 class ReviewService:
     def __init__(
         self,
@@ -31,7 +220,6 @@ class ReviewService:
         max_retries: int | None = None,
         retry_base_delay: float | None = None,
         checkpoint_path: Path | None = None,
-        max_upload_reviews: int | None = None,
     ):
         """
         Recebe o repositório, funções do agente e configurações de pipeline/lote via injeção de dependência.
@@ -43,11 +231,6 @@ class ReviewService:
             batch_api_threshold
             if batch_api_threshold is not None
             else settings.BATCH_API_THRESHOLD
-        )
-        self.max_upload_reviews = (
-            max_upload_reviews
-            if max_upload_reviews is not None
-            else getattr(settings, "MAX_UPLOAD_REVIEWS", 500)
         )
         self.max_concurrency = (
             max_concurrency if max_concurrency is not None else settings.MAX_CONCURRENCY
@@ -127,26 +310,31 @@ class ReviewService:
         except csv.Error:
             pass
 
-        reader = csv.DictReader(stream, delimiter=delimiter)
-        if not reader.fieldnames:
-            raise ValueError("O arquivo CSV está vazio ou sem cabeçalho.")
+        try:
+            reader = csv.DictReader(stream, delimiter=delimiter)
+            if not reader.fieldnames:
+                raise ValueError("O arquivo CSV está vazio ou sem cabeçalho.")
 
-        content_col = next(
-            (
-                col
-                for col in reader.fieldnames
-                if col and col.strip().lower() == "content"
-            ),
-            None,
-        )
-        if not content_col:
-            raise ValueError("O arquivo CSV deve conter uma coluna chamada 'content'.")
+            content_col = next(
+                (
+                    col
+                    for col in reader.fieldnames
+                    if col and col.strip().lower() == "content"
+                ),
+                None,
+            )
+            if not content_col:
+                raise ValueError(
+                    "O arquivo CSV deve conter uma coluna chamada 'content'."
+                )
 
-        reviews: list[str] = []
-        for row in reader:
-            val = row.get(content_col)
-            if val and str(val).strip():
-                reviews.append(str(val).strip())
+            reviews: list[str] = []
+            for row in reader:
+                val = row.get(content_col)
+                if val and str(val).strip():
+                    reviews.append(str(val).strip())
+        except csv.Error as e:
+            raise ValueError(f"Arquivo CSV malformado ou inválido: {e}") from e
 
         return reviews
 
@@ -228,7 +416,6 @@ class ReviewService:
 
     def _process_concurrent_pipeline(self, requests: list[ReviewRequest]) -> int:
         """
-        Estratégia para <= 500 avaliações:
         Pipeline com concorrência fixa, retry com backoff exponencial + jitter,
         e checkpointing com persistência imediata no banco de dados.
         """
@@ -252,7 +439,8 @@ class ReviewService:
             return 0
 
         workers = max(1, min(self.max_concurrency, len(pending)))
-        with ThreadPoolExecutor(max_workers=workers) as executor:
+        executor = ThreadPoolExecutor(max_workers=workers)
+        try:
             future_to_item = {
                 executor.submit(self._invoke_agent_with_retry, req): (item_hash, req)
                 for item_hash, req in pending
@@ -274,11 +462,16 @@ class ReviewService:
                         completed_hashes.add(item_hash)
                         self._update_checkpoint(completed_hashes)
                     processed_count += 1
-                except Exception:
+                except Exception as exc:
                     logger.exception(
                         "Falha definitiva ao processar avaliação no pipeline após retries."
                     )
+                    exc.processed_count = len(completed_hashes)  # type: ignore[attr-defined]
+                    exc.total_count = len(requests)  # type: ignore[attr-defined]
+                    executor.shutdown(wait=False, cancel_futures=True)
                     raise
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
         self._clear_checkpoint()
         return processed_count
@@ -315,26 +508,35 @@ class ReviewService:
 
     def process_file_upload(self, filename: str, raw_bytes: bytes) -> int:
         """
-        Lê um arquivo CSV ou JSON, extrai as avaliações do campo 'content' e processa o lote.
-        Limita a quantidade de avaliações a max_upload_reviews (padrão 500).
+        Lê um arquivo CSV ou JSON, extrai as avaliações do campo 'content' e processa o lote
+        sem limite de tamanho de dataset.
         Retorna a quantidade de avaliações processadas.
         """
         lower_name = (filename or "").lower()
-        text_content = raw_bytes.decode("utf-8-sig")
-
-        if lower_name.endswith(".csv"):
-            reviews = self.extract_reviews_from_csv(text_content)
-        elif lower_name.endswith(".json"):
-            reviews = self.extract_reviews_from_json(text_content)
-        else:
+        if not lower_name.endswith((".csv", ".json")):
             raise ValueError(
                 "Formato de arquivo não suportado. Envie um arquivo .csv ou .json."
             )
 
-        if len(reviews) > self.max_upload_reviews:
+        if not raw_bytes or not raw_bytes.strip():
+            raise ValueError("O arquivo enviado está vazio.")
+
+        try:
+            text_content = raw_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError as e:
             raise ValueError(
-                f"O arquivo contém {len(reviews)} avaliações. "
-                f"O limite máximo permitido por upload é de {self.max_upload_reviews} avaliações."
+                "Não foi possível ler o arquivo: codificação de texto inválida. "
+                "Salve o arquivo em formato UTF-8."
+            ) from e
+
+        if lower_name.endswith(".csv"):
+            reviews = self.extract_reviews_from_csv(text_content)
+        else:
+            reviews = self.extract_reviews_from_json(text_content)
+
+        if not reviews:
+            raise ValueError(
+                "Nenhuma avaliação válida foi encontrada no campo 'content' do arquivo enviado."
             )
 
         processed_count = self.process_reviews_batch(reviews)

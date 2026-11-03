@@ -15,7 +15,7 @@ if str(ROOT_DIR) not in sys.path:
 from src.agent.agent import analyze_review
 from src.database.sqlalchemy_repository import SQLAlchemyRepository
 from src.schemas import ReviewRequest
-from src.service.review_service import ReviewService
+from src.service.review_service import ReviewService, describe_processing_error
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -39,7 +39,6 @@ review_service = ReviewService(
     repository=review_repository,
     agent_function=analyze_review,
     checkpoint_path=ROOT_DIR / "data" / "checkpoint_batch.json",
-    max_upload_reviews=settings.MAX_UPLOAD_REVIEWS,
 )
 
 
@@ -182,11 +181,10 @@ def analyze():
         return redirect(
             url_for("index", error="O texto da avaliação não pode estar vazio.")
         )
-    except Exception:
+    except Exception as exc:
         logger.exception("Erro ao processar e armazenar a avaliação enviada.")
-        return redirect(
-            url_for("index", error="Erro ao processar a avaliação com o modelo de IA.")
-        )
+        error_msg = describe_processing_error(exc, is_batch=False)
+        return redirect(url_for("index", error=error_msg))
 
     return redirect(url_for("index"))
 
@@ -225,11 +223,10 @@ def upload_file():
     except ValueError as ve:
         logger.warning("Erro de validação no arquivo enviado: %s", ve)
         return redirect(url_for("index", error=str(ve)))
-    except Exception:
+    except Exception as exc:
         logger.exception("Erro ao processar o arquivo enviado no upload.")
-        return redirect(
-            url_for("index", error="Ocorreu um erro ao processar o arquivo enviado.")
-        )
+        error_msg = describe_processing_error(exc, is_batch=True)
+        return redirect(url_for("index", error=error_msg))
 
     return redirect(url_for("index"))
 

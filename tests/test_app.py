@@ -83,11 +83,11 @@ def test_upload_file_empty(mock_upload, client):
 
 @patch(
     "src.web.app.review_service.process_file_upload",
-    side_effect=ValueError("O limite máximo permitido por upload é de 500 avaliações."),
+    side_effect=ValueError("O arquivo CSV deve conter uma coluna chamada 'content'."),
 )
 def test_upload_file_validation_error(mock_upload, client):
     """Testa redirecionamento com mensagem de erro quando ocorre ValueError no upload."""
-    data = {"file": (io.BytesIO(b"content\nReview"), "test.csv")}
+    data = {"file": (io.BytesIO(b"id,texto\n1,Review"), "test.csv")}
     response = client.post(
         "/upload",
         data=data,
@@ -96,6 +96,25 @@ def test_upload_file_validation_error(mock_upload, client):
     )
     assert response.status_code == 302
     assert "error=" in response.location
+
+
+@patch("src.web.app.review_service.get_all_reviews", return_value=[])
+@patch(
+    "src.web.app.review_service.process_file_upload",
+    side_effect=RuntimeError("429 ResourceExhausted: Quota exceeded"),
+)
+def test_upload_file_api_rate_limit_error(mock_upload, mock_get_all, client):
+    """Testa se o endpoint /upload informa claramente ao usuário quando o limite da API é excedido."""
+    data = {"file": (io.BytesIO(b"content\nReview"), "test.csv")}
+    response = client.post(
+        "/upload",
+        data=data,
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Limite da API excedido" in html
 
 
 @patch("src.web.app.review_service.export_reviews_to_csv")

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.schemas import Review, ReviewRequest, ReviewResponse
-from src.service.review_service import ReviewService
+from src.service.review_service import ReviewService, describe_processing_error
 
 
 def test_process_and_save_review():
@@ -208,20 +208,79 @@ def test_process_reviews_batch_uses_concurrent_pipeline_and_ignores_batch_api():
     assert mock_repository.save.call_count == 10
 
 
-def test_process_file_upload_exceeds_max_limit():
-    """Testa se o upload de arquivo com mais de 500 avaliações lança erro de validação."""
+def test_process_file_upload_has_no_dataset_size_limit():
+    """Testa que não há limite de tamanho no dataset enviado via upload (ex: > 500 avaliações)."""
+    mock_repository = MagicMock()
+    mock_agent = MagicMock(return_value=ReviewResponse(analysis={"status": "ok"}))
     service = ReviewService(
-        repository=MagicMock(),
-        agent_function=MagicMock(),
-        max_upload_reviews=500,
+        repository=mock_repository,
+        agent_function=mock_agent,
+        max_concurrency=10,
     )
 
     csv_header = "id,content\n"
-    csv_rows = "".join(f"{i},Review número {i}\n" for i in range(501))
+    csv_rows = "".join(f"{i},Review número {i}\n" for i in range(600))
     csv_bytes = (csv_header + csv_rows).encode("utf-8")
 
-    with pytest.raises(ValueError, match="limite máximo permitido por upload é de 500"):
-        service.process_file_upload("reviews.csv", csv_bytes)
+    count = service.process_file_upload("reviews.csv", csv_bytes)
+    assert count == 600
+    assert mock_repository.save.call_count == 600
+
+
+def test_process_file_upload_empty_and_invalid_encoding():
+    """Testa mensagens de erro claras para arquivo vazio, sem conteúdo válido ou codificação inválida."""
+    service = ReviewService(repository=MagicMock(), agent_function=MagicMock())
+
+    with pytest.raises(ValueError, match="arquivo enviado está vazio"):
+        service.process_file_upload("reviews.csv", b"   ")
+
+    with pytest.raises(ValueError, match="codificação de texto inválida"):
+        service.process_file_upload("reviews.csv", b"\xff\xfe\x00\x80invalid")
+
+    with pytest.raises(ValueError, match="Nenhuma avaliação válida foi encontrada"):
+        service.process_file_upload("reviews.csv", b"id,content\n1,   \n")
+
+
+def test_describe_processing_error_classifications():
+    """Testa se diferentes falhas do lote são traduzidas em mensagens claras para o usuário."""
+    err_rate = RuntimeError("429 ResourceExhausted: Quota exceeded for quota metric")
+    assert "Limite da API excedido" in describe_processing_error(err_rate)
+
+    err_balance = RuntimeError("Error code: 402 - Insufficient Balance")
+    assert "Saldo ou créditos insuficientes" in describe_processing_error(err_balance)
+
+    err_auth = RuntimeError("401 Unauthorized: invalid_api_key")
+    assert "Falha de autenticação na API de IA" in describe_processing_error(err_auth)
+
+    err_context = RuntimeError("400 context_length_exceeded: maximum context length")
+    assert "Limite de tokens/contexto da API excedido" in describe_processing_error(
+        err_context
+    )
+
+    err_timeout = TimeoutError("Request timed out")
+    assert "Tempo limite de resposta da API excedido" in describe_processing_error(
+        err_timeout
+    )
+
+    err_conn = ConnectionError("503 Service Unavailable")
+    assert "Falha de conexão ou indisponibilidade" in describe_processing_error(
+        err_conn
+    )
+
+    err_not_found = RuntimeError("404 model_not_found")
+    assert "Modelo de IA não encontrado" in describe_processing_error(err_not_found)
+
+    err_safety = RuntimeError("Response blocked due to SAFETY")
+    assert "filtro de segurança" in describe_processing_error(err_safety)
+
+    err_db = RuntimeError("sqlalchemy.exc.OperationalError: database is locked")
+    assert "Erro no banco de dados" in describe_processing_error(err_db)
+
+    err_partial = RuntimeError("Rate limit 429")
+    err_partial.processed_count = 12  # type: ignore[attr-defined]
+    err_partial.total_count = 50  # type: ignore[attr-defined]
+    msg_partial = describe_processing_error(err_partial, is_batch=True)
+    assert "12 de 50 avaliações do lote já haviam sido salvas" in msg_partial
 
 
 def test_checkpoint_resume_in_concurrent_pipeline(tmp_path):
